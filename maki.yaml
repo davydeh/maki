@@ -1,0 +1,10 @@
+name: maki-demo
+
+processes:
+  - name: counter
+    cmd: "i=0; while true; do echo \"[$(date +%H:%M:%S)] count: $i\"; i=$((i+1)); sleep 1; done"
+  - name: server
+    cmd: "python3 -m http.server 8080"
+
+shells:
+  - name: shell
