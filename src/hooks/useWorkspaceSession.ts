@@ -550,6 +550,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
 
     async function boot() {
       let loadedState = DEFAULT_APP_STATE;
+      let currentWindow: ProjectWindowContext | null = null;
 
       try {
         loadedState = normalizeAppState(await invoke<WorkspaceAppState>("load_app_state"));
@@ -560,12 +561,24 @@ export function useWorkspaceSession(): WorkspaceSessionState {
 
         setAppState(loadedState);
 
-        if (!loadedState.last_project_path) {
+        try {
+          currentWindow = await invoke<ProjectWindowContext>("get_current_project_window");
+        } catch {
+          currentWindow = null;
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        const bootProjectPath = currentWindow?.project_path ?? loadedState.last_project_path;
+
+        if (!bootProjectPath) {
           setScreen("picker");
           return;
         }
 
-        const inspection = await inspectProject(loadedState.last_project_path);
+        const inspection = await inspectProject(bootProjectPath);
 
         if (cancelled) {
           return;
@@ -579,23 +592,6 @@ export function useWorkspaceSession(): WorkspaceSessionState {
 
         if (!inspection.has_config) {
           await enterWizardLocally(loadedState, inspection);
-          return;
-        }
-
-        let currentWindow: ProjectWindowContext | null = null;
-
-        try {
-          currentWindow = await invoke<ProjectWindowContext>("get_current_project_window");
-        } catch {
-          currentWindow = null;
-        }
-
-        if (cancelled) {
-          return;
-        }
-
-        if (currentWindow && currentWindow.project_path !== inspection.path) {
-          await routeToProjectWindow(inspection.path);
           return;
         }
 
@@ -622,7 +618,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
     return () => {
       cancelled = true;
     };
-  }, [clearWizardState, enterWizardLocally, enterWorkspaceLocally, inspectProject, routeToProjectWindow]);
+  }, [clearWizardState, enterWizardLocally, enterWorkspaceLocally, inspectProject]);
 
   return {
     screen,

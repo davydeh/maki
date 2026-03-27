@@ -342,36 +342,109 @@ describe("useWorkspaceSession", () => {
     expect(result.current.appState.recent_projects).toEqual([recentA, recentB]);
   });
 
-  it("focuses the existing window when the restored last project is already open", async () => {
+  it("uses the bound current project window before stale persisted state when the project has config", async () => {
+    const staleRecent = createRecentProject();
     const state = createAppState({
-      last_project_path: "/projects/alpha",
-      recent_projects: [createRecentProject()],
+      last_project_path: staleRecent.path,
+      recent_projects: [staleRecent],
     });
-    const inspection = createInspection();
+    const inspection = createInspection({
+      name: "beta",
+      path: "/projects/beta",
+    });
 
     mockInvoke({
       load_app_state: state,
       inspect_project_folder: inspection,
       get_current_project_window: createCurrentWindow({
-        project_path: "/projects/beta",
+        project_path: inspection.path,
         window_label: "project-9",
       }),
-      open_project_window: createOpenResult({
+      bind_current_project_window: createCurrentWindow({
         project_path: inspection.path,
-        created: false,
+        window_label: "project-9",
+      }),
+      save_app_state: createAppState({
+        last_project_path: inspection.path,
+        recent_projects: [createRecentProject({ name: inspection.name, path: inspection.path }), staleRecent],
       }),
     });
 
     const { result } = renderHook(() => useWorkspaceSession());
 
     await waitFor(() => {
-      expect(invokeMock).toHaveBeenCalledWith("open_project_window", {
-        projectPath: inspection.path,
-      });
+      expect(result.current.screen).toBe("workspace");
     });
 
-    expect(result.current.screen).toBe("booting");
-    expect(result.current.project).toBeNull();
+    expect(result.current.project).toEqual(inspection);
+    expect(result.current.appState).toEqual(
+      createAppState({
+        last_project_path: inspection.path,
+        recent_projects: [
+          createRecentProject({ name: inspection.name, path: inspection.path }),
+          staleRecent,
+        ],
+      })
+    );
+
+    expect(invokeMock).not.toHaveBeenCalledWith("open_project_window", {
+      projectPath: inspection.path,
+    });
+    expect(invokeMock).toHaveBeenCalledWith("bind_current_project_window", {
+      projectPath: inspection.path,
+    });
+  });
+
+  it("prefers the bound current project window over stale persisted state on boot when config is missing", async () => {
+    const staleRecent = createRecentProject();
+    const currentProject = createInspection({
+      name: "beta",
+      path: "/projects/beta",
+      has_config: false,
+      script_hints: ["npm run dev"],
+    });
+    const state = createAppState({
+      last_project_path: staleRecent.path,
+      recent_projects: [staleRecent],
+    });
+
+    mockInvoke({
+      load_app_state: state,
+      inspect_project_folder: currentProject,
+      get_current_project_window: createCurrentWindow({
+        project_path: currentProject.path,
+        window_label: "project-9",
+      }),
+      save_app_state: createAppState({
+        last_project_path: currentProject.path,
+        recent_projects: [
+          createRecentProject({ name: currentProject.name, path: currentProject.path }),
+          staleRecent,
+        ],
+      }),
+      generate_config_preview:
+        "name: beta\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
+    });
+
+    const { result } = renderHook(() => useWorkspaceSession());
+
+    await waitFor(() => {
+      expect(result.current.screen).toBe("wizard");
+    });
+
+    expect(result.current.project).toEqual(currentProject);
+    expect(result.current.appState).toEqual(
+      createAppState({
+        last_project_path: currentProject.path,
+        recent_projects: [
+          createRecentProject({ name: currentProject.name, path: currentProject.path }),
+          staleRecent,
+        ],
+      })
+    );
+    expect(invokeMock).not.toHaveBeenCalledWith("open_project_window", {
+      projectPath: currentProject.path,
+    });
   });
 
   it("restores locally on cold start when the first window is still unbound", async () => {
@@ -405,43 +478,6 @@ describe("useWorkspaceSession", () => {
       projectPath: inspection.path,
     });
     expect(result.current.project).toEqual(inspection);
-  });
-
-  it("routes restored boot state through native window routing when another window already hosts the project", async () => {
-    const state = createAppState({
-      last_project_path: "/projects/alpha",
-      recent_projects: [createRecentProject()],
-    });
-    const inspection = createInspection();
-
-    mockInvoke({
-      load_app_state: state,
-      inspect_project_folder: inspection,
-      get_current_project_window: createCurrentWindow({
-        project_path: "/projects/beta",
-        window_label: "project-9",
-      }),
-      open_project_window: createOpenResult({
-        project_path: inspection.path,
-        created: false,
-        window_label: "project-1",
-      }),
-    });
-
-    const { result } = renderHook(() => useWorkspaceSession());
-
-    await waitFor(() => {
-      expect(invokeMock).toHaveBeenCalledWith("open_project_window", {
-        projectPath: inspection.path,
-      });
-    });
-
-    expect(invokeMock).not.toHaveBeenCalledWith(
-      "save_app_state",
-      expect.anything()
-    );
-    expect(result.current.screen).toBe("booting");
-    expect(result.current.project).toBeNull();
   });
 
   it("saves wizard config with the backend's snake_case request contract", async () => {
@@ -858,7 +894,7 @@ describe("useWorkspaceSession", () => {
       await result.current.saveWizardConfig();
     });
 
-    expect(invokeMock).toHaveBeenCalledTimes(4);
+    expect(invokeMock).toHaveBeenCalledTimes(5);
     expect(result.current.wizardPreviewError).toBe(
       "Complete every enabled command before generating the preview."
     );
@@ -903,7 +939,7 @@ describe("useWorkspaceSession", () => {
       await result.current.saveWizardConfig();
     });
 
-    expect(invokeMock).toHaveBeenCalledTimes(4);
+    expect(invokeMock).toHaveBeenCalledTimes(5);
     expect(result.current.wizardPreviewError).toBe(
       "Complete every enabled command before generating the preview."
     );
