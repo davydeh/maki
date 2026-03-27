@@ -545,6 +545,72 @@ describe("useWorkspaceSession", () => {
     expect(result.current.project).toEqual(currentInspection);
   });
 
+  it("enters the wizard locally when selecting a different project without config from a live workspace", async () => {
+    const current = createRecentProject();
+    const other = createRecentProject({
+      name: "beta",
+      path: "/projects/beta",
+    });
+    const state = createAppState({
+      last_project_path: current.path,
+      recent_projects: [current, other],
+    });
+    const currentInspection = createInspection();
+    const otherInspection = createInspection({
+      name: "beta",
+      path: other.path,
+      has_config: false,
+      script_hints: ["npm run dev"],
+    });
+
+    mockInvoke({
+      load_app_state: state,
+      inspect_project_folder: [currentInspection, otherInspection],
+      get_current_project_window: createCurrentWindow({
+        project_path: current.path,
+      }),
+      bind_current_project_window: createCurrentWindow({
+        project_path: current.path,
+      }),
+      save_app_state: createAppState({
+        last_project_path: current.path,
+        recent_projects: [current, other],
+      }),
+      generate_config_preview:
+        "name: beta\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
+    });
+
+    const { result } = renderHook(() => useWorkspaceSession());
+
+    await waitFor(() => {
+      expect(result.current.screen).toBe("workspace");
+    });
+
+    await act(async () => {
+      await result.current.openRecentProject(other);
+    });
+
+    await waitFor(() => {
+      expect(result.current.screen).toBe("wizard");
+    });
+
+    expect(result.current.project).toEqual(otherInspection);
+    expect(result.current.wizardDraft).toEqual(
+      expect.objectContaining({
+        project_name: "beta",
+        commands: [
+          expect.objectContaining({
+            cmd: "npm run dev",
+            enabled: true,
+          }),
+        ],
+      })
+    );
+    expect(invokeMock).not.toHaveBeenCalledWith("open_project_window", {
+      projectPath: other.path,
+    });
+  });
+
   it("keeps picker state and app state intact when native routing fails from recents", async () => {
     const recentA = createRecentProject();
     const recentB = createRecentProject({

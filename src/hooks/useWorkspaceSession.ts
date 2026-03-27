@@ -338,7 +338,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
           return;
         }
 
-        if (!inspection.has_config && (!currentProject || currentProject.path === inspection.path)) {
+        if (!inspection.has_config) {
           enterWizardLocally(inspection);
           return;
         }
