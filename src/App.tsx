@@ -10,7 +10,7 @@ import { listen } from "@tauri-apps/api/event";
 import { ConfigWizardView } from "./components/ConfigWizardView";
 import { ProjectPickerView } from "./components/ProjectPickerView";
 import { StatusBar } from "./components/StatusBar";
-import { TabBar, CommandBar } from "./components/TabBar";
+import { TabBar, CommandBar, CommandLauncher } from "./components/TabBar";
 import { TerminalView } from "./components/TerminalView";
 import { useWorkspaceSession } from "./hooks/useWorkspaceSession";
 import { getTheme, type Theme } from "./themes";
@@ -114,6 +114,7 @@ export default function App() {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState("");
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
+  const [commandLauncherOpen, setCommandLauncherOpen] = useState(false);
 
   const theme = getTheme(workspaceConfig?.config.theme);
 
@@ -200,30 +201,48 @@ export default function App() {
     [activeTabId]
   );
 
-  const handleToggleProcess = useCallback((id: string) => {
+  const handleRunCommand = useCallback((id: string) => {
+    setTabs((prev) => {
+      const tab = prev.find((t) => t.id === id);
+      if (!tab) return prev;
+
+      if (tab.status === "running") {
+        setActiveTabId(tab.id);
+        return prev;
+      }
+
+      if (tab.status === "stopped" || tab.status === "errored") {
+        const newId = genId();
+        setActiveTabId(newId);
+        return prev.map((t) =>
+          t.id === id
+            ? {
+              ...t,
+              id: newId,
+              status: "running" as const,
+              sessionId: undefined,
+              autostart: t.autostart,
+            }
+            : t
+        );
+      }
+
+      return prev;
+    });
+  }, []);
+
+  const handleStopCommand = useCallback((id: string) => {
     setTabs((prev) => {
       const tab = prev.find((t) => t.id === id);
       if (!tab) return prev;
 
       if (tab.status === "running" && tab.sessionId !== undefined) {
         void invoke("kill_pty", { sessionId: tab.sessionId });
-        return prev.map((t) =>
-          t.id === id ? { ...t, status: "stopped" as const } : t
-        );
       }
 
-      if (tab.status === "stopped" || tab.status === "errored") {
-        // Re-spawn: give a new ID so React remounts TerminalView with a fresh PTY
-        const newId = genId();
-        setActiveTabId((current) => (current === id ? newId : current));
-        return prev.map((t) =>
-          t.id === id
-            ? { ...t, id: newId, status: "running" as const, sessionId: undefined, autostart: true }
-            : t
-        );
-      }
-
-      return prev;
+      return prev.map((t) =>
+        t.id === id ? { ...t, status: "stopped" as const, sessionId: undefined } : t
+      );
     });
   }, []);
 
@@ -286,6 +305,11 @@ export default function App() {
       if (event.metaKey && event.key === "o") {
         event.preventDefault();
         handleOpenFolder();
+      }
+
+      if (event.metaKey && (event.key === "/" || event.key.toLowerCase() === "k")) {
+        event.preventDefault();
+        setCommandLauncherOpen(true);
       }
 
       if (event.metaKey && event.key >= "1" && event.key <= "9") {
@@ -470,11 +494,21 @@ export default function App() {
       </div>
 
       <CommandBar
-        tabs={tabs}
+        commands={tabs.filter((tab) => tab.type === "process" && tab.autostart)}
+        hasOneOffCommands={tabs.some((tab) => tab.type === "process" && !tab.autostart)}
         activeTabId={activeTabId}
         theme={theme}
-        onTabClick={handleTabClick}
-        onToggleProcess={handleToggleProcess}
+        onRunCommand={handleRunCommand}
+        onStopCommand={handleStopCommand}
+        onOpenLauncher={() => setCommandLauncherOpen(true)}
+      />
+
+      <CommandLauncher
+        open={commandLauncherOpen}
+        commands={tabs.filter((tab) => tab.type === "process" && !tab.autostart)}
+        theme={theme}
+        onClose={() => setCommandLauncherOpen(false)}
+        onRunCommand={handleRunCommand}
       />
 
       <StatusBar

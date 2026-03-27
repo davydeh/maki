@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, Fragment } from "react";
-import { Plus, FolderOpen } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Plus, FolderOpen, Play, Square, Search } from "lucide-react";
 import type { Tab } from "../types";
 import type { Theme } from "../themes";
 
@@ -103,37 +103,54 @@ export function TabBar({
 /* ── Command bar (sits at the bottom, above status bar) ── */
 
 interface CommandBarProps {
-  tabs: Tab[];
+  commands: Tab[];
+  hasOneOffCommands: boolean;
   activeTabId: string;
   theme: Theme;
-  onTabClick: (id: string) => void;
-  onToggleProcess: (id: string) => void;
+  onRunCommand: (id: string) => void;
+  onStopCommand: (id: string) => void;
+  onOpenLauncher: () => void;
 }
 
 export function CommandBar({
-  tabs,
+  commands,
+  hasOneOffCommands,
   activeTabId,
   theme,
-  onTabClick,
-  onToggleProcess,
+  onRunCommand,
+  onStopCommand,
+  onOpenLauncher,
 }: CommandBarProps) {
-  const commands = tabs.filter((t) => t.type === "process");
-  if (commands.length === 0) return null;
+  if (commands.length === 0 && !hasOneOffCommands) return null;
 
   return (
     <div className="command-bar">
-      {commands.map((tab, i) => (
-        <Fragment key={tab.id}>
-          {i > 0 && <span className="command-bar__divider" />}
-          <CommandItem
+      <div className="command-bar__meta">Auto-run</div>
+
+      <div className="command-bar__group">
+        {commands.length === 0 && (
+          <span className="command-bar__empty">No auto-run commands configured</span>
+        )}
+
+        {commands.map((tab) => (
+          <CommandPill
+            key={tab.id}
             tab={tab}
             isActive={tab.id === activeTabId}
             theme={theme}
-            onTabClick={onTabClick}
-            onToggleProcess={onToggleProcess}
+            onRunCommand={onRunCommand}
+            onStopCommand={onStopCommand}
           />
-        </Fragment>
-      ))}
+        ))}
+      </div>
+
+      {hasOneOffCommands && (
+        <button className="command-launcher-trigger" onClick={onOpenLauncher}>
+          <Search size={12} />
+          <span>Run command</span>
+          <span className="command-launcher-trigger__hint">Cmd+K</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -291,27 +308,23 @@ function ShellTab({
   );
 }
 
-/* ── Command item (flex-distributed) ── */
-
-function CommandItem({
+function CommandPill({
   tab,
   isActive,
   theme,
-  onTabClick,
-  onToggleProcess,
+  onRunCommand,
+  onStopCommand,
 }: {
   tab: Tab;
   isActive: boolean;
   theme: Theme;
-  onTabClick: (id: string) => void;
-  onToggleProcess: (id: string) => void;
+  onRunCommand: (id: string) => void;
+  onStopCommand: (id: string) => void;
 }) {
-  const [hovered, setHovered] = useState(false);
-
   const isRunning = tab.status === "running";
   const isErrored = tab.status === "errored";
 
-  const dotColor = isRunning
+  const stateColor = isRunning
     ? theme.running
     : isErrored
       ? theme.errored
@@ -319,62 +332,197 @@ function CommandItem({
 
   return (
     <div
-      className="command-bar__item"
-      onClick={() => onTabClick(tab.id)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className={`command-pill ${isActive ? "command-pill--active" : ""}`}
       style={{
-        color: isActive ? theme.activeTabFg : theme.tabFg,
-        fontWeight: isActive ? 600 : 400,
+        borderColor: isActive ? theme.accent : theme.border,
+        color: isActive ? theme.fg : theme.tabFg,
       }}
     >
-      {hovered ? (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleProcess(tab.id);
-          }}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "14px",
-            height: "14px",
-            padding: 0,
-            border: `1px solid ${theme.stopped}`,
-            borderRadius: "3px",
-            background: "none",
-            color: isRunning ? theme.stopped : theme.running,
-            cursor: "pointer",
-            fontSize: "7px",
-            lineHeight: 1,
-            flexShrink: 0,
-          }}
-          title={isRunning ? "Stop" : "Start"}
-        >
-          {isRunning ? "■" : "▶"}
-        </button>
-      ) : (
-        <span
-          style={{
-            display: "inline-block",
-            width: "7px",
-            height: "7px",
-            borderRadius: "50%",
-            backgroundColor: dotColor,
-            flexShrink: 0,
-          }}
-        />
-      )}
-      <span
-        style={{
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
+      <button
+        className="command-pill__run"
+        onClick={() => onRunCommand(tab.id)}
+        title={isRunning ? "Open running command" : "Run command"}
       >
-        {tab.name}
-      </span>
+        <span className="command-pill__state" style={{ backgroundColor: stateColor }} />
+        {isRunning ? <Square size={10} strokeWidth={2.5} /> : <Play size={10} strokeWidth={2.5} />}
+        <span className="command-pill__name">{tab.name}</span>
+      </button>
+
+      {isRunning && (
+        <button
+          className="command-pill__stop"
+          onClick={() => onStopCommand(tab.id)}
+          title="Stop command"
+        >
+          <Square size={10} strokeWidth={2.5} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+interface CommandLauncherProps {
+  open: boolean;
+  commands: Tab[];
+  theme: Theme;
+  onClose: () => void;
+  onRunCommand: (id: string) => void;
+}
+
+export function CommandLauncher({
+  open,
+  commands,
+  theme,
+  onClose,
+  onRunCommand,
+}: CommandLauncherProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) {
+      return commands;
+    }
+
+    return commands.filter((command) => {
+      const haystack = `${command.name} ${command.args.join(" ")}`.toLowerCase();
+      return haystack.includes(normalized);
+    });
+  }, [commands, query]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    setQuery("");
+    setActiveIndex(0);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const maxIndex = Math.max(0, filtered.length - 1);
+    if (activeIndex > maxIndex) {
+      setActiveIndex(maxIndex);
+    }
+  }, [activeIndex, filtered.length, open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setActiveIndex((current) => Math.min(current + 1, Math.max(0, filtered.length - 1)));
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setActiveIndex((current) => Math.max(current - 1, 0));
+        return;
+      }
+
+      if (event.key === "Enter") {
+        if (filtered.length === 0) {
+          return;
+        }
+
+        event.preventDefault();
+        onRunCommand(filtered[activeIndex].id);
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeIndex, filtered, onClose, onRunCommand, open]);
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="command-launcher" onClick={onClose}>
+      <div
+        className="command-launcher__panel"
+        style={{
+          borderColor: theme.border,
+          background: theme.tabBarBg,
+          color: theme.fg,
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="command-launcher__input-wrap" style={{ borderColor: theme.border }}>
+          <Search size={14} />
+          <input
+            ref={inputRef}
+            className="command-launcher__input"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setActiveIndex(0);
+            }}
+            placeholder="Search one-off commands..."
+          />
+          <span className="command-launcher__hint">Esc</span>
+        </div>
+
+        <div className="command-launcher__list">
+          {filtered.length === 0 && (
+            <div className="command-launcher__empty">No matching command</div>
+          )}
+
+          {filtered.map((command, index) => {
+            const isRunning = command.status === "running";
+            return (
+              <button
+                key={command.id}
+                className={`command-launcher__item ${index === activeIndex ? "is-active" : ""}`}
+                style={{
+                  borderColor: index === activeIndex ? theme.accent : "transparent",
+                  color: index === activeIndex ? theme.fg : theme.tabFg,
+                }}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => {
+                  onRunCommand(command.id);
+                  onClose();
+                }}
+              >
+                <span
+                  className="command-launcher__dot"
+                  style={{
+                    backgroundColor:
+                      command.status === "running"
+                        ? theme.running
+                        : command.status === "errored"
+                          ? theme.errored
+                          : theme.stopped,
+                  }}
+                />
+                <span className="command-launcher__name">{command.name}</span>
+                <span className="command-launcher__run">{isRunning ? "Open" : "Run"}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
