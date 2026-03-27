@@ -31,10 +31,10 @@ export function TabBar({
       style={{
         display: "flex",
         alignItems: "center",
-        height: "38px",
-        padding: "0 8px",
-        gap: "4px",
-        background: theme.activeTabBg,
+        height: "34px",
+        padding: "0",
+        gap: "0",
+        background: theme.tabBarBg,
         userSelect: "none",
       }}
       data-tauri-drag-region
@@ -57,42 +57,40 @@ export function TabBar({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          width: "28px",
-          height: "28px",
+          width: "34px",
+          height: "34px",
           background: "none",
           border: "none",
-          color: theme.tabFg,
+          color: theme.fg,
           cursor: "pointer",
-          borderRadius: "6px",
-          opacity: 0.4,
+          borderRadius: "999px",
+          opacity: 0.6,
           flexShrink: 0,
         }}
         title="New shell (Cmd+T)"
       >
-        <Plus size={14} />
+        <Plus size={15} />
       </button>
-
-      <div style={{ flex: 1 }} data-tauri-drag-region />
 
       <button
         onClick={onOpenFolder}
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "4px",
+          justifyContent: "center",
+          width: "34px",
+          height: "34px",
           background: "none",
           border: "none",
-          color: theme.tabFg,
+          color: theme.fg,
           cursor: "pointer",
-          fontSize: "11px",
-          padding: "4px 8px",
-          lineHeight: 1,
-          opacity: 0.4,
+          borderRadius: "999px",
+          opacity: 0.6,
           flexShrink: 0,
         }}
         title="Open Folder... (Cmd+O)"
       >
-        <FolderOpen size={12} />
+        <FolderOpen size={14} />
       </button>
     </div>
   );
@@ -187,10 +185,11 @@ function ShellTab({
         gap: "6px",
         flex: 1,
         minWidth: 0,
-        padding: "5px 12px",
-        borderRadius: "8px",
-        backgroundColor: isActive ? theme.tabBarBg : "transparent",
-        color: isActive ? theme.activeTabFg : theme.tabFg,
+        height: "100%",
+        padding: "0 12px",
+        borderRadius: "999px",
+        backgroundColor: isActive ? theme.activeTabBg : "transparent",
+        color: isActive ? theme.fg : theme.tabFg,
         cursor: "pointer",
         fontSize: "12px",
         fontWeight: isActive ? 600 : 400,
@@ -242,13 +241,13 @@ function ShellTab({
           style={{
             background: "none",
             border: "none",
-            color: theme.stopped,
+            color: theme.fg,
             cursor: "pointer",
-            fontSize: "13px",
+            fontSize: "14px",
             padding: 0,
             lineHeight: 1,
             flexShrink: 0,
-            opacity: 0.6,
+            opacity: 0.5,
           }}
           title="Close (Cmd+W)"
         >
