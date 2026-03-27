@@ -7,11 +7,12 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub theme: Option<String>,
     #[serde(default)]
     pub processes: Vec<ProcessConfig>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub shells: Vec<ShellConfig>,
 }
 
@@ -21,14 +22,19 @@ pub struct ProcessConfig {
     pub cmd: String,
     #[serde(default = "default_true")]
     pub autostart: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub cwd: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub env: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub restart: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub max_restarts: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub restart_delay: Option<u64>,
 }
@@ -36,6 +42,7 @@ pub struct ProcessConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ShellConfig {
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub cmd: Option<String>,
 }
@@ -67,6 +74,31 @@ pub enum DetectionSignal {
         requirements_txt: Option<String>,
         entrypoints: Vec<String>,
     },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct ConfigCommandDraft {
+    pub name: String,
+    pub cmd: String,
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub autostart: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct ConfigDraft {
+    pub project_name: String,
+    #[serde(default)]
+    pub theme: Option<String>,
+    #[serde(default)]
+    pub commands: Vec<ConfigCommandDraft>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct ConfigSaveRequest {
+    pub project_path: String,
+    pub draft: ConfigDraft,
 }
 
 fn default_true() -> bool {
@@ -114,6 +146,45 @@ pub fn inspect_project_folder(path: String) -> Result<ProjectInspection, String>
     Ok(inspect_project_folder_path(&resolved_path))
 }
 
+#[tauri::command]
+pub async fn open_folder_dialog(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let selected_folder = app
+        .dialog()
+        .file()
+        .set_title("Open Folder")
+        .blocking_pick_folder();
+
+    selected_folder
+        .map(|folder_path| {
+            let path = folder_path
+                .into_path()
+                .map_err(|err| format!("Resolving selected folder: {err}"))?;
+            canonicalize_existing_project_directory(path)
+                .map(|canonical_path| canonical_path.to_string_lossy().into_owned())
+        })
+        .transpose()
+}
+
+#[tauri::command]
+pub fn generate_config_preview(draft: ConfigDraft) -> Result<String, String> {
+    let config = config_from_draft(draft)?;
+    serialize_config(&config)
+}
+
+#[tauri::command]
+pub fn save_config(request: ConfigSaveRequest) -> Result<String, String> {
+    let project_path = canonicalize_existing_project_directory(&request.project_path)?;
+    let yaml = generate_config_preview(request.draft)?;
+    let config_path = project_path.join("maki.yaml");
+
+    fs::write(&config_path, yaml)
+        .map_err(|err| format!("Writing config {}: {err}", config_path.display()))?;
+
+    Ok(config_path.to_string_lossy().into_owned())
+}
+
 pub fn resolve_project_path(path: impl AsRef<Path>) -> Result<PathBuf, String> {
     let path = path.as_ref();
 
@@ -129,6 +200,33 @@ pub fn resolve_project_path(path: impl AsRef<Path>) -> Result<PathBuf, String> {
 
     let current_dir = env::current_dir().map_err(|e| format!("Resolving project path: {}", e))?;
     Ok(current_dir.join(path))
+}
+
+pub(crate) fn canonicalize_existing_project_directory(
+    path: impl AsRef<Path>,
+) -> Result<PathBuf, String> {
+    let resolved_path = resolve_project_path(path)?;
+
+    if !resolved_path.exists() {
+        return Err(format!(
+            "Project folder {} does not exist",
+            resolved_path.display()
+        ));
+    }
+
+    if !resolved_path.is_dir() {
+        return Err(format!(
+            "Project folder {} is not a directory",
+            resolved_path.display()
+        ));
+    }
+
+    resolved_path.canonicalize().map_err(|err| {
+        format!(
+            "Resolving project folder {}: {err}",
+            resolved_path.display()
+        )
+    })
 }
 
 fn inspect_project_folder_path(path: &Path) -> ProjectInspection {
@@ -305,6 +403,40 @@ fn push_unique(values: &mut Vec<String>, value: String) {
     }
 }
 
+fn config_from_draft(draft: ConfigDraft) -> Result<Config, String> {
+    let processes = draft
+        .commands
+        .into_iter()
+        .filter(|command| command.enabled)
+        .map(|command| ProcessConfig {
+            name: command.name,
+            cmd: command.cmd,
+            autostart: command.autostart,
+            cwd: None,
+            env: None,
+            restart: None,
+            max_restarts: None,
+            restart_delay: None,
+        })
+        .collect::<Vec<_>>();
+
+    if processes.is_empty() {
+        return Err("Config must include at least one enabled command".to_string());
+    }
+
+    Ok(Config {
+        name: draft.project_name,
+        theme: draft.theme,
+        processes,
+        shells: Vec::new(),
+    })
+}
+
+fn serialize_config(config: &Config) -> Result<String, String> {
+    let yaml = serde_yaml::to_string(config).map_err(|err| format!("Serializing config: {err}"))?;
+    Ok(yaml.strip_prefix("---\n").unwrap_or(&yaml).to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -417,5 +549,93 @@ mod tests {
         let inspection = inspect_project_folder(temp_dir.to_string_lossy().into_owned()).unwrap();
 
         assert_eq!(inspection.name, "my-project");
+    }
+
+    #[test]
+    fn generate_config_preview_serializes_enabled_commands_to_processes() {
+        let preview = generate_config_preview(ConfigDraft {
+            project_name: "demo".to_string(),
+            theme: None,
+            commands: vec![
+                ConfigCommandDraft {
+                    name: "web".to_string(),
+                    cmd: "npm run dev".to_string(),
+                    enabled: true,
+                    autostart: true,
+                },
+                ConfigCommandDraft {
+                    name: "worker".to_string(),
+                    cmd: "npm run queue".to_string(),
+                    enabled: false,
+                    autostart: false,
+                },
+            ],
+        })
+        .unwrap();
+
+        let config: Config = serde_yaml::from_str(&preview).unwrap();
+
+        assert_eq!(config.name, "demo");
+        assert_eq!(config.processes.len(), 1);
+        assert_eq!(config.processes[0].name, "web");
+        assert_eq!(config.processes[0].cmd, "npm run dev");
+        assert!(config.processes[0].autostart);
+        assert!(config.shells.is_empty());
+        assert!(!preview.contains("worker"));
+    }
+
+    #[test]
+    fn save_config_rejects_empty_command_lists() {
+        let temp_dir = unique_temp_dir("save-config-empty");
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let error = save_config(ConfigSaveRequest {
+            project_path: temp_dir.to_string_lossy().into_owned(),
+            draft: ConfigDraft {
+                project_name: "demo".to_string(),
+                theme: None,
+                commands: Vec::new(),
+            },
+        })
+        .unwrap_err();
+
+        assert!(error.contains("at least one enabled command"));
+    }
+
+    #[test]
+    fn save_config_writes_maki_yaml_to_project_root() {
+        let temp_dir = unique_temp_dir("save-config-write");
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let saved_path = save_config(ConfigSaveRequest {
+            project_path: temp_dir.to_string_lossy().into_owned(),
+            draft: ConfigDraft {
+                project_name: "demo".to_string(),
+                theme: Some("dracula".to_string()),
+                commands: vec![ConfigCommandDraft {
+                    name: "web".to_string(),
+                    cmd: "npm run dev".to_string(),
+                    enabled: true,
+                    autostart: true,
+                }],
+            },
+        })
+        .unwrap();
+
+        assert_eq!(
+            saved_path,
+            temp_dir
+                .canonicalize()
+                .unwrap()
+                .join("maki.yaml")
+                .to_string_lossy()
+        );
+
+        let config = get_config(saved_path).unwrap();
+        assert_eq!(config.name, "demo");
+        assert_eq!(config.theme.as_deref(), Some("dracula"));
+        assert_eq!(config.processes.len(), 1);
+        assert_eq!(config.processes[0].name, "web");
+        assert_eq!(config.processes[0].cmd, "npm run dev");
     }
 }
