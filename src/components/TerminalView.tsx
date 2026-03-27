@@ -67,13 +67,9 @@ export function TerminalView({
       // Test environment — unicode addon not available
     }
 
-    try {
-      const webglAddon = new WebglAddon();
-      webglAddon.onContextLoss(() => webglAddon.dispose());
-      term.loadAddon(webglAddon);
-    } catch {
-      // WebGL not available, canvas fallback
-    }
+    // WebGL disabled: GPU context limit (~16) is easily exceeded with many
+    // tabs. The DOM renderer is fast enough and avoids context starvation.
+    // TODO: re-enable WebGL for the active tab only if perf demands it.
 
     fitAddon.fit();
     termRef.current = term;

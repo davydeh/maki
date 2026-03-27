@@ -115,7 +115,6 @@ export default function App() {
   const [activeTabId, setActiveTabId] = useState("");
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [commandLauncherOpen, setCommandLauncherOpen] = useState(false);
-
   const theme = getTheme(workspaceConfig?.config.theme);
 
   useEffect(() => {
