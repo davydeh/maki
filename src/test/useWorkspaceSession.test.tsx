@@ -732,6 +732,96 @@ describe("useWorkspaceSession", () => {
     );
   });
 
+  it("blocks preview and save when an enabled detected command is blank", async () => {
+    const state = createAppState({
+      last_project_path: "/projects/alpha",
+      recent_projects: [createRecentProject()],
+    });
+    const inspection = createInspection({
+      has_config: false,
+      script_hints: ["npm run dev"],
+    });
+
+    mockInvoke({
+      load_app_state: state,
+      inspect_project_folder: inspection,
+      save_app_state: state,
+      generate_config_preview:
+        "name: alpha\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
+    });
+
+    const { result } = renderHook(() => useWorkspaceSession());
+
+    await waitFor(() => {
+      expect(result.current.screen).toBe("wizard");
+    });
+
+    act(() => {
+      result.current.updateWizardCommand("detected-0", { cmd: "   " });
+    });
+
+    await act(async () => {
+      await result.current.refreshWizardPreview();
+    });
+
+    await act(async () => {
+      await result.current.saveWizardConfig();
+    });
+
+    expect(invokeMock).toHaveBeenCalledTimes(4);
+    expect(result.current.wizardPreviewError).toBe(
+      "Complete every enabled command before generating the preview."
+    );
+    expect(result.current.restoreError).toBe(
+      "Complete every enabled command before saving the config."
+    );
+  });
+
+  it("blocks preview and save when a manual enabled command is blank", async () => {
+    const state = createAppState({
+      last_project_path: "/projects/alpha",
+      recent_projects: [createRecentProject()],
+    });
+    const inspection = createInspection({
+      has_config: false,
+      script_hints: [],
+      entrypoint_hints: [],
+    });
+
+    mockInvoke({
+      load_app_state: state,
+      inspect_project_folder: inspection,
+      save_app_state: state,
+      generate_config_preview: new Error("Config must include at least one enabled command"),
+    });
+
+    const { result } = renderHook(() => useWorkspaceSession());
+
+    await waitFor(() => {
+      expect(result.current.screen).toBe("wizard");
+    });
+
+    act(() => {
+      result.current.addWizardCommand();
+    });
+
+    await act(async () => {
+      await result.current.refreshWizardPreview();
+    });
+
+    await act(async () => {
+      await result.current.saveWizardConfig();
+    });
+
+    expect(invokeMock).toHaveBeenCalledTimes(4);
+    expect(result.current.wizardPreviewError).toBe(
+      "Complete every enabled command before generating the preview."
+    );
+    expect(result.current.restoreError).toBe(
+      "Complete every enabled command before saving the config."
+    );
+  });
+
   it("keeps picker state and app state intact when native routing fails from recents", async () => {
     const recentA = createRecentProject();
     const recentB = createRecentProject({

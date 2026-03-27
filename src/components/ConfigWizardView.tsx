@@ -106,6 +106,14 @@ function formatSourceLabel(source: string): string {
   return "Manual";
 }
 
+function hasInvalidEnabledCommands(draft: WizardDraft): boolean {
+  return draft.commands.some(
+    (command) =>
+      command.enabled &&
+      (command.name.trim().length === 0 || command.cmd.trim().length === 0)
+  );
+}
+
 export function ConfigWizardView({
   project,
   restoreError,
@@ -122,8 +130,10 @@ export function ConfigWizardView({
   onOpenFolder,
 }: ConfigWizardViewProps) {
   const enabledCommands = wizardDraft.commands.filter((command) => command.enabled).length;
+  const hasInvalidCommands = hasInvalidEnabledCommands(wizardDraft);
   const canSave =
     enabledCommands > 0 &&
+    !hasInvalidCommands &&
     !wizardPreviewPending &&
     !wizardSavePending &&
     !wizardPreviewDirty &&
@@ -202,6 +212,12 @@ export function ConfigWizardView({
           {wizardDraft.commands.length === 0 && (
             <div className="shell-field">
               No commands yet. Add one manually to continue.
+            </div>
+          )}
+
+          {hasInvalidCommands && (
+            <div className="shell-field">
+              Complete every enabled command before previewing or saving.
             </div>
           )}
 
@@ -303,6 +319,7 @@ export function ConfigWizardView({
               type="button"
               className="shell-button"
               style={{ minHeight: 38, padding: "0 14px" }}
+              disabled={hasInvalidCommands || wizardPreviewPending}
               onClick={() => {
                 void onRefreshPreview();
               }}

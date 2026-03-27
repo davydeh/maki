@@ -166,6 +166,16 @@ function toSaveConfigRequest(projectPath: string, draft: WizardDraft) {
   };
 }
 
+function isBlank(value: string): boolean {
+  return value.trim().length === 0;
+}
+
+function hasInvalidEnabledCommands(draft: WizardDraft): boolean {
+  return draft.commands.some(
+    (command) => command.enabled && (isBlank(command.name) || isBlank(command.cmd))
+  );
+}
+
 export interface WorkspaceSessionState {
   screen: AppScreen;
   appState: WorkspaceAppState;
@@ -266,6 +276,13 @@ export function useWorkspaceSession(): WorkspaceSessionState {
     async (draftOverride?: WizardDraft) => {
       const draftToPreview = draftOverride ?? wizardDraftRef.current;
       if (!draftToPreview) {
+        return;
+      }
+
+      if (hasInvalidEnabledCommands(draftToPreview)) {
+        setWizardPreviewError("Complete every enabled command before generating the preview.");
+        setWizardPreviewPending(false);
+        setWizardPreviewSignature(null);
         return;
       }
 
@@ -466,6 +483,12 @@ export function useWorkspaceSession(): WorkspaceSessionState {
 
       const draftToSave = draftOverride ?? wizardDraft;
       if (!draftToSave) {
+        return;
+      }
+
+      if (hasInvalidEnabledCommands(draftToSave)) {
+        setRestoreError("Complete every enabled command before saving the config.");
+        setScreen("wizard");
         return;
       }
 

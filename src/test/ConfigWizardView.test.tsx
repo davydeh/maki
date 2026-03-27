@@ -328,6 +328,52 @@ describe("ConfigWizardView", () => {
     expect(invokeMock).not.toHaveBeenCalledWith("save_config", expect.anything());
   });
 
+  it("disables preview and save when an enabled detected command is blank", async () => {
+    mockInvoke({
+      load_app_state: createAppState(),
+      inspect_project_folder: createInspection(),
+      save_app_state: createAppState(),
+      generate_config_preview:
+        "name: alpha\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
+    });
+
+    render(<SessionWizardHarness />);
+
+    const firstCommand = await screen.findByTestId("wizard-command-detected-0");
+    fireEvent.change(within(firstCommand).getByLabelText("Command"), {
+      target: { value: "   " },
+    });
+
+    expect(screen.getByText(/complete every enabled command/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /refresh preview/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /save config/i })).toBeDisabled();
+  });
+
+  it("disables preview and save when a manual enabled command is blank", async () => {
+    const emptyInspection = createInspection({
+      detected_stacks: [],
+      script_hints: [],
+      entrypoint_hints: [],
+    });
+
+    mockInvoke({
+      load_app_state: createAppState(),
+      inspect_project_folder: emptyInspection,
+      save_app_state: createAppState(),
+      generate_config_preview: new Error("Config must include at least one enabled command"),
+    });
+
+    render(<SessionWizardHarness />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /add command/i }));
+
+    await screen.findByTestId("wizard-command-manual-0");
+
+    expect(screen.getByText(/complete every enabled command/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /refresh preview/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /save config/i })).toBeDisabled();
+  });
+
   it("calls the native save command before transitioning into workspace state", async () => {
     const missingConfigInspection = createInspection();
     const savedInspection = createInspection({ has_config: true });
