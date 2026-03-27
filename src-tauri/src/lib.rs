@@ -20,6 +20,16 @@ pub fn run() {
             let split_down = MenuItem::with_id(app, "split-down", "Split Down", true, Some("CmdOrCtrl+Shift+D"))?;
             let close_tab = MenuItem::with_id(app, "close-tab", "Close", true, Some("CmdOrCtrl+W"))?;
 
+            let app_menu = SubmenuBuilder::new(app, "maki")
+                .about(None)
+                .separator()
+                .hide()
+                .hide_others()
+                .show_all()
+                .separator()
+                .quit()
+                .build()?;
+
             let file_menu = SubmenuBuilder::new(app, "File")
                 .item(&new_window)
                 .item(&new_tab)
@@ -43,6 +53,7 @@ pub fn run() {
                 .build()?;
 
             let menu = MenuBuilder::new(app)
+                .item(&app_menu)
                 .item(&file_menu)
                 .item(&edit_menu)
                 .item(&window_menu)
