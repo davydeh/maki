@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Terminal, Plus } from "lucide-react";
+import { useState, Fragment } from "react";
+import { Plus } from "lucide-react";
 import type { Tab } from "../types";
 import type { Theme } from "../themes";
 
@@ -36,14 +36,14 @@ export function TabBar({
         userSelect: "none",
       }}
     >
-      {/* Row 1: Shell tabs (browser tabs) */}
+      {/* Row 1: Shell tabs */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          height: "36px",
+          height: "38px",
           padding: "0 8px",
-          gap: "1px",
+          gap: "2px",
           borderBottom: `1px solid ${theme.border}`,
         }}
         data-tauri-drag-region
@@ -72,11 +72,12 @@ export function TabBar({
             color: theme.tabFg,
             cursor: "pointer",
             borderRadius: "6px",
-            opacity: 0.5,
+            opacity: 0.4,
+            fontSize: "14px",
           }}
           title="New shell (Cmd+T)"
         >
-          <Plus size={14} />
+          <Plus size={15} />
         </button>
 
         <div style={{ flex: 1 }} data-tauri-drag-region />
@@ -91,7 +92,7 @@ export function TabBar({
             fontSize: "11px",
             padding: "4px 8px",
             lineHeight: 1,
-            opacity: 0.5,
+            opacity: 0.4,
           }}
           title="Open Folder... (Cmd+O)"
         >
@@ -106,21 +107,33 @@ export function TabBar({
             display: "flex",
             alignItems: "center",
             height: "28px",
-            padding: "0 10px",
-            gap: "2px",
+            padding: "0 8px",
+            gap: "0",
             borderBottom: `1px solid ${theme.border}`,
-            fontSize: "11px",
+            background: theme.activeTabBg,
+            fontSize: "12px",
           }}
         >
-          {commands.map((tab) => (
-            <CommandBookmark
-              key={tab.id}
-              tab={tab}
-              isActive={tab.id === activeTabId}
-              theme={theme}
-              onTabClick={onTabClick}
-              onToggleProcess={onToggleProcess}
-            />
+          {commands.map((tab, i) => (
+            <Fragment key={tab.id}>
+              {i > 0 && (
+                <span
+                  style={{
+                    width: "1px",
+                    height: "12px",
+                    background: theme.border,
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+              <CommandBookmark
+                tab={tab}
+                isActive={tab.id === activeTabId}
+                theme={theme}
+                onTabClick={onTabClick}
+                onToggleProcess={onToggleProcess}
+              />
+            </Fragment>
           ))}
         </div>
       )}
@@ -128,7 +141,7 @@ export function TabBar({
   );
 }
 
-/* Shell tab — browser-tab style */
+/* Shell tab — browser-tab style with >_ prefix */
 function ShellTab({
   tab,
   isActive,
@@ -148,20 +161,29 @@ function ShellTab({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "6px",
-        padding: "4px 12px",
+        gap: "8px",
+        padding: "5px 14px",
         minWidth: "100px",
-        maxWidth: "200px",
-        borderRadius: "6px",
+        maxWidth: "220px",
+        borderRadius: "8px 8px 0 0",
         backgroundColor: isActive ? theme.activeTabBg : "transparent",
         color: isActive ? theme.activeTabFg : theme.tabFg,
         cursor: "pointer",
-        fontSize: "12px",
-        fontWeight: isActive ? 600 : 400,
+        fontSize: "13px",
+        fontWeight: isActive ? 700 : 400,
         transition: "background-color 100ms ease",
       }}
     >
-      <Terminal size={12} style={{ opacity: 0.5, flexShrink: 0 }} />
+      <span
+        style={{
+          fontSize: "12px",
+          opacity: isActive ? 0.7 : 0.4,
+          flexShrink: 0,
+          fontFamily: '"SF Mono", Menlo, monospace',
+        }}
+      >
+        &gt;_
+      </span>
       <span
         style={{
           overflow: "hidden",
@@ -187,6 +209,7 @@ function ShellTab({
             lineHeight: 1,
             marginLeft: "auto",
             flexShrink: 0,
+            opacity: 0.7,
           }}
           title="Close (Cmd+W)"
         >
@@ -197,7 +220,7 @@ function ShellTab({
   );
 }
 
-/* Command bookmark — compact status item */
+/* Command bookmark — compact with pipe separators */
 function CommandBookmark({
   tab,
   isActive,
@@ -231,16 +254,14 @@ function CommandBookmark({
         display: "flex",
         alignItems: "center",
         gap: "5px",
-        padding: "2px 8px",
+        padding: "2px 10px",
         borderRadius: "4px",
-        backgroundColor: isActive ? theme.activeTabBg : "transparent",
         color: isActive ? theme.activeTabFg : theme.tabFg,
         cursor: "pointer",
-        fontWeight: isActive ? 600 : 400,
+        fontWeight: isActive ? 700 : 400,
         transition: "background-color 100ms ease",
       }}
     >
-      {/* Status dot or toggle button on hover */}
       {hovered ? (
         <button
           onClick={(e) => {
