@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Plus, FolderOpen, Search } from "lucide-react";
+import { Plus, FolderOpen, Search, Play, Square } from "lucide-react";
 import type { Tab } from "../types";
 import type { Theme } from "../themes";
 
@@ -107,6 +107,7 @@ interface CommandBarProps {
   hasOneOffCommands: boolean;
   activeTabId: string;
   theme: Theme;
+  onFocusCommand: (id: string) => void;
   onRunCommand: (id: string) => void;
   onStopCommand: (id: string) => void;
   onOpenLauncher: () => void;
@@ -117,6 +118,7 @@ export function CommandBar({
   hasOneOffCommands,
   activeTabId,
   theme,
+  onFocusCommand,
   onRunCommand,
   onStopCommand,
   onOpenLauncher,
@@ -136,6 +138,7 @@ export function CommandBar({
             tab={tab}
             isActive={tab.id === activeTabId}
             theme={theme}
+            onFocusCommand={onFocusCommand}
             onRunCommand={onRunCommand}
             onStopCommand={onStopCommand}
           />
@@ -310,65 +313,73 @@ function CommandPill({
   tab,
   isActive,
   theme,
+  onFocusCommand,
   onRunCommand,
   onStopCommand,
 }: {
   tab: Tab;
   isActive: boolean;
   theme: Theme;
+  onFocusCommand: (id: string) => void;
   onRunCommand: (id: string) => void;
   onStopCommand: (id: string) => void;
 }) {
-  const [hovered, setHovered] = useState(false);
   const isRunning = tab.status === "running";
-  const isErrored = tab.status === "errored";
+  const isStopped = tab.status === "stopped" || tab.status === "errored";
 
   const dotColor = isRunning
     ? theme.running
-    : isErrored
+    : tab.status === "errored"
       ? theme.errored
       : theme.stopped;
 
   return (
     <button
       className="command-pill"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={(e) => {
-        e.stopPropagation();
-        // Just focus, don't restart running commands
-        if (isRunning) {
-          onRunCommand(tab.id); // this just focuses via setActiveTabId
-        }
-      }}
+      onClick={() => onFocusCommand(tab.id)}
       style={{
         color: isActive ? theme.fg : theme.tabFg,
         fontWeight: isActive ? 600 : 400,
       }}
     >
-      <span
-        style={{
-          width: "6px",
-          height: "6px",
-          borderRadius: "50%",
-          backgroundColor: dotColor,
-          flexShrink: 0,
-        }}
-      />
-      <span className="command-pill__name">{tab.name}</span>
-      {hovered && isRunning && (
+      <span className="command-pill__indicator">
         <span
-          className="command-pill__action"
-          onClick={(e) => {
-            e.stopPropagation();
-            onStopCommand(tab.id);
+          className="command-pill__dot"
+          style={{
+            width: "6px",
+            height: "6px",
+            borderRadius: "50%",
+            backgroundColor: dotColor,
           }}
-          title="Stop"
-          style={{ color: theme.errored }}
-        >
-          ■
-        </span>
-      )}
+        />
+        {isRunning && (
+          <span
+            className="command-pill__action-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStopCommand(tab.id);
+            }}
+            title="Stop"
+            style={{ color: theme.errored }}
+          >
+            <Square size={12} fill="currentColor" />
+          </span>
+        )}
+        {isStopped && (
+          <span
+            className="command-pill__action-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRunCommand(tab.id);
+            }}
+            title="Restart"
+            style={{ color: theme.running }}
+          >
+            <Play size={12} fill="currentColor" />
+          </span>
+        )}
+      </span>
+      <span className="command-pill__name">{tab.name}</span>
     </button>
   );
 }

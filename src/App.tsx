@@ -201,18 +201,21 @@ export default function App() {
   );
 
   const handleRunCommand = useCallback((id: string) => {
+    let focusId: string | null = null;
+
     setTabs((prev) => {
       const tab = prev.find((t) => t.id === id);
       if (!tab) return prev;
 
       // Already running — just focus it
       if (tab.status === "running") {
-        setActiveTabId(tab.id);
+        focusId = tab.id;
         return prev;
       }
 
       // Restart: new ID forces TerminalView remount with fresh PTY
       const newId = genId();
+      focusId = newId;
       const isTransient = !tab.autostart;
       const updated = {
         ...tab,
@@ -223,12 +226,15 @@ export default function App() {
         transient: isTransient,
       };
 
-      setActiveTabId(newId);
-
       // Remove old entry, append updated at end of process tabs
       const without = prev.filter((t) => t.id !== id);
       return [...without, updated];
     });
+
+    // Set active tab outside the updater — nested setStates can be dropped
+    if (focusId) {
+      setActiveTabId(focusId);
+    }
   }, []);
 
   const handleStopCommand = useCallback((id: string) => {
@@ -511,6 +517,7 @@ export default function App() {
         hasOneOffCommands={tabs.some((tab) => tab.type === "process" && !tab.autostart)}
         activeTabId={activeTabId}
         theme={theme}
+        onFocusCommand={handleTabClick}
         onRunCommand={handleRunCommand}
         onStopCommand={handleStopCommand}
         onOpenLauncher={() => setCommandLauncherOpen(true)}

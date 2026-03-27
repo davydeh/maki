@@ -38,6 +38,7 @@ export function TerminalView({
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  const webglRef = useRef<WebglAddon | null>(null);
   const sessionIdRef = useRef<number | null>(null);
 
   // Initialize terminal and PTY
@@ -66,10 +67,6 @@ export function TerminalView({
     } catch {
       // Test environment — unicode addon not available
     }
-
-    // WebGL disabled: GPU context limit (~16) is easily exceeded with many
-    // tabs. The DOM renderer is fast enough and avoids context starvation.
-    // TODO: re-enable WebGL for the active tab only if perf demands it.
 
     fitAddon.fit();
     termRef.current = term;
@@ -219,6 +216,10 @@ export function TerminalView({
         invoke("kill_pty", { sessionId: sessionIdRef.current });
         sessionIdRef.current = null;
       }
+      if (webglRef.current) {
+        webglRef.current.dispose();
+        webglRef.current = null;
+      }
       termRef.current = null;
       fitRef.current = null;
       term.dispose();
@@ -252,15 +253,37 @@ export function TerminalView({
     })();
   }, [workspaceActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Focus and resize when tab becomes active
+  // Focus, resize, and manage WebGL when tab becomes active
   useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+
     if (active) {
       requestAnimationFrame(() => {
         fitRef.current?.fit();
-        if (typeof termRef.current?.focus === "function") {
-          termRef.current.focus();
+        // Load WebGL for active tab only (powerline glyphs, perf)
+        // Only 1 GPU context at a time — well under the ~16 limit
+        if (!webglRef.current) {
+          try {
+            const webgl = new WebglAddon();
+            webgl.onContextLoss(() => {
+              webgl.dispose();
+              webglRef.current = null;
+            });
+            term.loadAddon(webgl);
+            webglRef.current = webgl;
+          } catch {
+            // Canvas fallback — no action needed
+          }
         }
+        term.focus();
       });
+    } else {
+      // Release GPU context for inactive tabs
+      if (webglRef.current) {
+        webglRef.current.dispose();
+        webglRef.current = null;
+      }
     }
   }, [active]);
 
@@ -277,6 +300,7 @@ export function TerminalView({
   return (
     <div
       ref={containerRef}
+      onClick={() => termRef.current?.focus()}
       style={{
         display: active ? "block" : "none",
         width: "100%",
