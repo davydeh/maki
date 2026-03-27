@@ -82,7 +82,7 @@ describe("ProjectPickerView", () => {
     invokeMock.mockReset();
   });
 
-  it("renders recent projects with name primary and path secondary", () => {
+  it("renders recent projects with name and shortened parent path", () => {
     const alpha = createRecentProject();
     const beta = createRecentProject({
       name: "beta",
@@ -99,12 +99,12 @@ describe("ProjectPickerView", () => {
     );
 
     expect(screen.getByRole("button", { name: /alpha/i })).toHaveTextContent("alpha");
-    expect(screen.getByText("/projects/alpha")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /beta/i })).toHaveTextContent("beta");
-    expect(screen.getByText("/projects/beta")).toBeInTheDocument();
+    // Parent dir is shown, not the full path
+    expect(screen.getAllByText("/projects")).toHaveLength(2);
   });
 
-  it("keeps the visible project path in the accessible name for duplicate folder names", () => {
+  it("distinguishes duplicate folder names by their parent path", () => {
     const alphaA = createRecentProject();
     const alphaB = createRecentProject({
       path: "/archive/alpha",
@@ -122,8 +122,8 @@ describe("ProjectPickerView", () => {
     const buttons = screen.getAllByRole("button", { name: /^alpha/i });
 
     expect(buttons).toHaveLength(2);
-    expect(buttons[0]).toHaveAccessibleName("alpha/projects/alpha");
-    expect(buttons[1]).toHaveAccessibleName("alpha/archive/alpha");
+    expect(buttons[0]).toHaveTextContent("/projects");
+    expect(buttons[1]).toHaveTextContent("/archive");
   });
 
   it("shows restore error banner when provided", () => {
@@ -141,7 +141,7 @@ describe("ProjectPickerView", () => {
     );
   });
 
-  it("calls open folder when the button is clicked", () => {
+  it("calls open folder when the card is clicked", () => {
     const onOpenFolder = vi.fn();
 
     render(
@@ -176,29 +176,29 @@ describe("ProjectPickerView", () => {
     expect(onSelectRecentProject).toHaveBeenCalledWith(alpha);
   });
 
-  it("keeps the open-folder action outside the scrollable picker body", () => {
-    const { container } = render(
+  it("shows at most 5 recent projects with a View all count", () => {
+    const projects = Array.from({ length: 8 }, (_, index) =>
+      createRecentProject({
+        name: `project-${index}`,
+        path: `/projects/project-${index}`,
+      })
+    );
+
+    render(
       <ProjectPickerView
-        recentProjects={Array.from({ length: 20 }, (_, index) =>
-          createRecentProject({
-            name: `project-${index}`,
-            path: `/projects/project-${index}`,
-          })
-        )}
+        recentProjects={projects}
         restoreError={null}
         onOpenFolder={vi.fn()}
         onSelectRecentProject={vi.fn()}
       />
     );
 
-    const pickerBody = container.querySelector(".project-picker__body");
-    const pickerFooter = container.querySelector(".project-picker__footer");
-    const openFolderButton = screen.getByRole("button", { name: /open folder/i });
-
-    expect(pickerBody).not.toBeNull();
-    expect(pickerFooter).not.toBeNull();
-    expect(pickerBody).not.toContainElement(openFolderButton);
-    expect(pickerFooter).toContainElement(openFolderButton);
+    // Only 5 project rows rendered (plus the "Open folder" card button)
+    const projectButtons = screen.getAllByRole("button").filter(
+      (btn) => !btn.textContent?.includes("Open folder")
+    );
+    expect(projectButtons).toHaveLength(5);
+    expect(screen.getByText("View all (8)")).toBeInTheDocument();
   });
 
   it("reaches the native open folder command instead of only mutating local state", async () => {

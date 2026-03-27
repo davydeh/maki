@@ -99,10 +99,6 @@ export function TerminalView({
       );
       unlisteners.push(unlisten2);
 
-      // Only attach the PTY once this tab belongs to an active workspace.
-      if (autostart && workspaceActive) {
-        await spawnPty(term);
-      }
     })();
 
     // Forward keyboard input to PTY
@@ -126,24 +122,6 @@ export function TerminalView({
       }
     });
 
-    async function spawnPty(t: Terminal) {
-      try {
-        const sessionId = await invoke<number>("spawn_pty", {
-          cmd,
-          args,
-          cols: t.cols,
-          rows: t.rows,
-          cwd: cwd || null,
-          env: env || null,
-        });
-        sessionIdRef.current = sessionId;
-        onSessionCreated(tabId, sessionId);
-      } catch (e) {
-        t.write(`\x1b[31mError spawning process: ${e}\x1b[0m\r\n`);
-        onExit(tabId, -1);
-      }
-    }
-
     return () => {
       unlisteners.forEach((fn) => fn());
       if (sessionIdRef.current !== null) {
@@ -152,6 +130,33 @@ export function TerminalView({
       term.dispose();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Spawn PTY when workspace becomes active (handles v0.2 boot flow where
+  // workspaceActive is false at mount time and transitions to true later).
+  useEffect(() => {
+    if (!workspaceActive || !autostart) return;
+    if (sessionIdRef.current !== null) return; // already spawned
+    const term = termRef.current;
+    if (!term) return;
+
+    (async () => {
+      try {
+        const sessionId = await invoke<number>("spawn_pty", {
+          cmd,
+          args,
+          cols: term.cols,
+          rows: term.rows,
+          cwd: cwd || null,
+          env: env || null,
+        });
+        sessionIdRef.current = sessionId;
+        onSessionCreated(tabId, sessionId);
+      } catch (e) {
+        term.write(`\x1b[31mError spawning process: ${e}\x1b[0m\r\n`);
+        onExit(tabId, -1);
+      }
+    })();
+  }, [workspaceActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resize on active/window change
   useEffect(() => {

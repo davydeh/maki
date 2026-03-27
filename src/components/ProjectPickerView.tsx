@@ -7,6 +7,23 @@ interface ProjectPickerViewProps {
   onSelectRecentProject: (project: RecentProject) => void | Promise<void>;
 }
 
+function shortenPath(fullPath: string): string {
+  const home = "/Users/";
+  const idx = fullPath.indexOf(home);
+  if (idx === -1) return fullPath;
+  const afterHome = fullPath.slice(idx + home.length);
+  const slashIdx = afterHome.indexOf("/");
+  if (slashIdx === -1) return "~";
+  return "~" + afterHome.slice(slashIdx);
+}
+
+function parentDir(fullPath: string): string {
+  const short = shortenPath(fullPath);
+  const lastSlash = short.lastIndexOf("/");
+  if (lastSlash <= 0) return short;
+  return short.slice(0, lastSlash);
+}
+
 export function ProjectPickerView({
   recentProjects,
   restoreError,
@@ -17,12 +34,8 @@ export function ProjectPickerView({
     <div className="shell-screen">
       <div className="shell-panel project-picker">
         <div className="project-picker__body">
-          <div className="shell-copy">
-            <span className="shell-kicker">maki</span>
-            <h1 className="shell-title">Choose a workspace</h1>
-            <p className="shell-subtitle">
-              Open a project folder or recover from one of your recent workspaces.
-            </p>
+          <div className="project-picker__header">
+            <span className="project-picker__brand">maki</span>
           </div>
 
           {restoreError && (
@@ -31,47 +44,75 @@ export function ProjectPickerView({
             </div>
           )}
 
-          <section className="shell-section" aria-labelledby="recent-projects-title">
-            <div className="shell-section-header">
-              <h2 className="shell-section-title" id="recent-projects-title">
-                Recent Projects
+          <div className="project-picker__actions">
+            <button
+              type="button"
+              className="project-picker__card"
+              onClick={() => {
+                void onOpenFolder();
+              }}
+            >
+              <svg
+                className="project-picker__card-icon"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+              </svg>
+              <span className="project-picker__card-label">Open folder</span>
+            </button>
+          </div>
+
+          <section
+            className="project-picker__recents"
+            aria-labelledby="recent-projects-title"
+          >
+            <div className="project-picker__recents-header">
+              <h2
+                className="project-picker__recents-title"
+                id="recent-projects-title"
+              >
+                Recent projects
               </h2>
+              {recentProjects.length > 5 && (
+                <span className="project-picker__recents-count">
+                  View all ({recentProjects.length})
+                </span>
+              )}
             </div>
 
             {recentProjects.length === 0 ? (
-              <div className="shell-field project-picker__empty">
-                No recent projects yet. Open a folder to start a workspace.
-              </div>
+              <p className="project-picker__empty">
+                No recent projects yet. Open a folder to get started.
+              </p>
             ) : (
               <div className="project-picker__list">
-                {recentProjects.map((project) => (
+                {recentProjects.slice(0, 5).map((project) => (
                   <button
                     key={project.path}
                     type="button"
-                    className="project-picker__item"
+                    className="project-picker__row"
                     onClick={() => {
                       void onSelectRecentProject(project);
                     }}
                   >
-                    <span className="project-picker__name">{project.name}</span>
-                    <span className="project-picker__path">{project.path}</span>
+                    <span className="project-picker__name">
+                      {project.name}
+                    </span>
+                    <span className="project-picker__path">
+                      {parentDir(project.path)}
+                    </span>
                   </button>
                 ))}
               </div>
             )}
           </section>
-        </div>
-
-        <div className="shell-actions project-picker__footer">
-          <button
-            type="button"
-            className="shell-button"
-            onClick={() => {
-              void onOpenFolder();
-            }}
-          >
-            Open Folder...
-          </button>
         </div>
       </div>
     </div>
