@@ -10,6 +10,228 @@ html, body, #root {
   overflow: hidden;
 }
 
+:root {
+  color-scheme: dark;
+  --shell-bg: #1e1e2e;
+  --shell-fg: #cdd6f4;
+  --shell-surface: #181825;
+  --shell-surface-strong: #313244;
+  --shell-muted: #6c7086;
+  --shell-accent: #89b4fa;
+  --shell-border: #313244;
+  --shell-danger: #f38ba8;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  background: var(--shell-bg);
+  color: var(--shell-fg);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.shell-screen {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background:
+    radial-gradient(circle at top left, rgba(137, 180, 250, 0.18), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(49, 50, 68, 0.85), transparent 38%),
+    linear-gradient(180deg, rgba(24, 24, 37, 0.96), rgba(30, 30, 46, 1));
+  color: var(--shell-fg);
+}
+
+.shell-panel {
+  width: min(720px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px;
+  border: 1px solid var(--shell-border);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(49, 50, 68, 0.28), rgba(24, 24, 37, 0)),
+    var(--shell-surface);
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(205, 214, 244, 0.03);
+}
+
+.shell-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shell-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--shell-accent);
+}
+
+.shell-title {
+  font-size: clamp(28px, 4vw, 36px);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.shell-subtitle {
+  max-width: 56ch;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--shell-muted);
+}
+
+.shell-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shell-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.shell-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--shell-muted);
+}
+
+.shell-field {
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid var(--shell-border);
+  border-radius: 14px;
+  background: rgba(49, 50, 68, 0.54);
+  color: var(--shell-fg);
+  line-height: 1.5;
+}
+
+.shell-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(137, 180, 250, 1), rgba(116, 159, 232, 1));
+  color: #11111b;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease;
+  box-shadow: 0 10px 24px rgba(137, 180, 250, 0.28);
+}
+
+.shell-button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.02);
+}
+
+.shell-button:focus-visible,
+.project-picker__item:focus-visible {
+  outline: 2px solid var(--shell-accent);
+  outline-offset: 2px;
+}
+
+.shell-button:active,
+.project-picker__item:active {
+  transform: translateY(0);
+}
+
+.shell-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.shell-error-banner {
+  padding: 12px 14px;
+  border: 1px solid rgba(243, 139, 168, 0.36);
+  border-radius: 14px;
+  background: rgba(243, 139, 168, 0.12);
+  color: #f5c2e7;
+  line-height: 1.5;
+}
+
+.project-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.project-picker__item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 15px 16px;
+  border: 1px solid var(--shell-border);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(137, 180, 250, 0.04), rgba(137, 180, 250, 0)),
+    rgba(49, 50, 68, 0.56);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    transform 120ms ease,
+    background-color 120ms ease;
+}
+
+.project-picker__item:hover {
+  border-color: rgba(137, 180, 250, 0.55);
+  background:
+    linear-gradient(180deg, rgba(137, 180, 250, 0.08), rgba(137, 180, 250, 0)),
+    rgba(49, 50, 68, 0.7);
+  transform: translateY(-1px);
+}
+
+.project-picker__name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--shell-fg);
+}
+
+.project-picker__path,
+.project-picker__empty {
+  font-size: 13px;
+  color: var(--shell-muted);
+}
+
+.project-picker__path {
+  word-break: break-all;
+}
+
+@media (max-width: 640px) {
+  .shell-screen {
+    padding: 20px;
+  }
+
+  .shell-panel {
+    padding: 22px;
+    border-radius: 18px;
+  }
 }
