@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
@@ -42,8 +43,7 @@ impl WorkspaceAppState {
         let canonical_path = canonicalize_project_path(path.as_ref())?;
         let canonical_path_string = canonical_path.to_string_lossy().into_owned();
 
-        self
-            .recent_projects
+        self.recent_projects
             .retain(|project| project.path != canonical_path_string);
         self.recent_projects.insert(
             0,
@@ -69,8 +69,7 @@ pub fn save_app_state(
     state: WorkspaceAppState,
 ) -> Result<WorkspaceAppState, String> {
     let state_path = workspace_state_path(&app)?;
-    save_app_state_to_file(&state_path, &state)?;
-    Ok(state)
+    save_app_state_to_file(&state_path, &state)
 }
 
 pub fn workspace_app_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -100,7 +99,7 @@ pub fn load_app_state_from_file(path: impl AsRef<Path>) -> Result<WorkspaceAppSt
 pub fn save_app_state_to_file(
     path: impl AsRef<Path>,
     state: &WorkspaceAppState,
-) -> Result<(), String> {
+) -> Result<WorkspaceAppState, String> {
     let path = path.as_ref();
 
     if let Some(parent) = path.parent() {
@@ -108,16 +107,44 @@ pub fn save_app_state_to_file(
             .map_err(|err| format!("Creating app state dir {}: {err}", parent.display()))?;
     }
 
-    let mut state_to_save = state.clone();
-    state_to_save.version = SCHEMA_VERSION;
+    let state_to_save = normalize_app_state_for_save(state)?;
 
     let json = serde_json::to_string_pretty(&state_to_save)
         .map_err(|err| format!("Serializing app state {}: {err}", path.display()))?;
-    fs::write(path, json).map_err(|err| format!("Writing app state {}: {err}", path.display()))
+    fs::write(path, json).map_err(|err| format!("Writing app state {}: {err}", path.display()))?;
+    Ok(state_to_save)
 }
 
 fn default_schema_version() -> u32 {
     SCHEMA_VERSION
+}
+
+fn normalize_app_state_for_save(state: &WorkspaceAppState) -> Result<WorkspaceAppState, String> {
+    let mut normalized = state.clone();
+    normalized.version = SCHEMA_VERSION;
+    normalized.recent_projects = normalize_recent_projects(&state.recent_projects)?;
+    Ok(normalized)
+}
+
+fn normalize_recent_projects(
+    recent_projects: &[RecentProject],
+) -> Result<Vec<RecentProject>, String> {
+    let mut deduped = Vec::new();
+    let mut seen_paths = HashSet::new();
+
+    for project in recent_projects {
+        let canonical_path = canonicalize_project_path(Path::new(&project.path))?;
+        let canonical_path_string = canonical_path.to_string_lossy().into_owned();
+
+        if seen_paths.insert(canonical_path_string.clone()) {
+            deduped.push(RecentProject {
+                name: project.name.clone(),
+                path: canonical_path_string,
+            });
+        }
+    }
+
+    Ok(deduped)
 }
 
 #[allow(dead_code)]
@@ -166,7 +193,10 @@ mod tests {
 
         let mut state = WorkspaceAppState::default();
         state
-            .record_recent_project("Alpha".to_string(), project_a.to_string_lossy().into_owned())
+            .record_recent_project(
+                "Alpha".to_string(),
+                project_a.to_string_lossy().into_owned(),
+            )
             .unwrap();
         state
             .record_recent_project("Beta".to_string(), project_b.to_string_lossy().into_owned())
@@ -178,19 +208,28 @@ mod tests {
             )
             .unwrap();
 
-        save_app_state_to_file(&state_path, &state).unwrap();
+        let normalized = save_app_state_to_file(&state_path, &state).unwrap();
         let reloaded = load_app_state_from_file(&state_path).unwrap();
 
+        assert_eq!(normalized, reloaded);
         assert_eq!(
             reloaded.recent_projects,
             vec![
                 RecentProject {
                     name: "Alpha Updated".to_string(),
-                    path: project_a.canonicalize().unwrap().to_string_lossy().into_owned(),
+                    path: project_a
+                        .canonicalize()
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned(),
                 },
                 RecentProject {
                     name: "Beta".to_string(),
-                    path: project_b.canonicalize().unwrap().to_string_lossy().into_owned(),
+                    path: project_b
+                        .canonicalize()
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned(),
                 },
             ]
         );
@@ -216,6 +255,58 @@ mod tests {
         assert_eq!(
             reloaded.last_project_path,
             Some(project_path.to_string_lossy().into_owned())
+        );
+    }
+
+    #[test]
+    fn save_normalizes_canonical_aliases_before_persisting() {
+        let temp_dir = unique_temp_dir("state-alias");
+        fs::create_dir_all(&temp_dir).unwrap();
+        let state_path = temp_dir.join("workspace_state.json");
+
+        let project_dir = temp_dir.join("project");
+        fs::create_dir_all(&project_dir).unwrap();
+
+        let alias_path = project_dir.join(".");
+        let mut state = WorkspaceAppState::default();
+        state.recent_projects = vec![
+            RecentProject {
+                name: "Alias".to_string(),
+                path: alias_path.to_string_lossy().into_owned(),
+            },
+            RecentProject {
+                name: "Canonical".to_string(),
+                path: project_dir
+                    .canonicalize()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned(),
+            },
+        ];
+
+        let normalized = save_app_state_to_file(&state_path, &state).unwrap();
+
+        let canonical_path = project_dir
+            .canonicalize()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        assert_eq!(
+            normalized.recent_projects,
+            vec![RecentProject {
+                name: "Alias".to_string(),
+                path: canonical_path.clone(),
+            }]
+        );
+
+        let reloaded = load_app_state_from_file(&state_path).unwrap();
+        assert_eq!(reloaded, normalized);
+        assert_eq!(
+            reloaded.recent_projects,
+            vec![RecentProject {
+                name: "Alias".to_string(),
+                path: canonical_path,
+            }]
         );
     }
 }

@@ -230,7 +230,6 @@ fn detect_laravel_signals(
 
     if laravel_framework || artisan_path.exists() {
         push_unique(entrypoint_hints, "php artisan serve".to_string());
-        push_unique(entrypoint_hints, "php artisan migrate".to_string());
         detected_stacks.push(DetectionSignal::Laravel {
             composer_json: composer_json_path
                 .exists()
@@ -294,8 +293,7 @@ fn composer_depends_on_laravel(json: &serde_json::Value) -> bool {
 }
 
 fn contains_dependency(json: &serde_json::Value, field: &str, dependency: &str) -> bool {
-    json
-        .get(field)
+    json.get(field)
         .and_then(|value| value.as_object())
         .map(|dependencies| dependencies.contains_key(dependency))
         .unwrap_or(false)
@@ -335,8 +333,14 @@ mod tests {
 
         let inspection = inspect_project_folder(temp_dir.to_string_lossy().into_owned()).unwrap();
 
-        assert_eq!(inspection.name, temp_dir.file_name().unwrap().to_string_lossy());
-        assert_eq!(inspection.path, temp_dir.canonicalize().unwrap().to_string_lossy());
+        assert_eq!(
+            inspection.name,
+            temp_dir.file_name().unwrap().to_string_lossy()
+        );
+        assert_eq!(
+            inspection.path,
+            temp_dir.canonicalize().unwrap().to_string_lossy()
+        );
         assert!(inspection.exists);
         assert!(inspection.has_config);
         assert!(inspection.detected_stacks.is_empty());
@@ -358,25 +362,49 @@ mod tests {
         )
         .unwrap();
         fs::write(temp_dir.join("artisan"), "#!/usr/bin/env php\n").unwrap();
-        fs::write(temp_dir.join("pyproject.toml"), "[project]\nname = \"demo\"\n").unwrap();
+        fs::write(
+            temp_dir.join("pyproject.toml"),
+            "[project]\nname = \"demo\"\n",
+        )
+        .unwrap();
         fs::write(temp_dir.join("main.py"), "print('demo')\n").unwrap();
 
         let inspection = inspect_project_folder(temp_dir.to_string_lossy().into_owned()).unwrap();
 
-        assert!(inspection.detected_stacks.iter().any(|signal| matches!(
-            signal,
-            DetectionSignal::Node { .. }
-        )));
-        assert!(inspection.detected_stacks.iter().any(|signal| matches!(
-            signal,
-            DetectionSignal::Laravel { .. }
-        )));
-        assert!(inspection.detected_stacks.iter().any(|signal| matches!(
-            signal,
-            DetectionSignal::Python { .. }
-        )));
-        assert!(!inspection.script_hints.is_empty());
-        assert!(!inspection.entrypoint_hints.is_empty());
+        assert!(inspection
+            .detected_stacks
+            .iter()
+            .any(|signal| matches!(signal, DetectionSignal::Node { .. })));
+        assert!(inspection
+            .detected_stacks
+            .iter()
+            .any(|signal| matches!(signal, DetectionSignal::Laravel { .. })));
+        assert!(inspection
+            .detected_stacks
+            .iter()
+            .any(|signal| matches!(signal, DetectionSignal::Python { .. })));
+
+        let mut script_hints = inspection.script_hints.clone();
+        script_hints.sort();
+        assert_eq!(
+            script_hints,
+            vec!["npm run dev".to_string(), "npm run start".to_string()]
+        );
+
+        let mut entrypoint_hints = inspection.entrypoint_hints.clone();
+        entrypoint_hints.sort();
+        assert_eq!(
+            entrypoint_hints,
+            vec![
+                "npm run dev".to_string(),
+                "npm start".to_string(),
+                "php artisan serve".to_string(),
+                "python main.py".to_string(),
+            ]
+        );
+        assert!(!entrypoint_hints
+            .iter()
+            .any(|hint| hint == "php artisan migrate"));
     }
 
     #[test]
