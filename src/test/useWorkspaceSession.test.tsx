@@ -683,7 +683,7 @@ describe("useWorkspaceSession", () => {
     expect(result.current.project).toEqual(currentInspection);
   });
 
-  it("enters the wizard locally when selecting a different project without config from a live workspace", async () => {
+  it("routes configless project selection through a new window from a live workspace", async () => {
     const current = createRecentProject();
     const other = createRecentProject({
       name: "beta",
@@ -714,8 +714,10 @@ describe("useWorkspaceSession", () => {
         last_project_path: other.path,
         recent_projects: [other, current],
       }),
-      generate_config_preview:
-        "name: beta\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
+      open_project_window: createOpenResult({
+        project_path: other.path,
+        created: true,
+      }),
     });
 
     const { result } = renderHook(() => useWorkspaceSession());
@@ -728,29 +730,16 @@ describe("useWorkspaceSession", () => {
       await result.current.openRecentProject(other);
     });
 
-    await waitFor(() => {
-      expect(result.current.screen).toBe("wizard");
-    });
-
-    expect(result.current.project).toEqual(otherInspection);
+    expect(result.current.screen).toBe("workspace");
+    expect(result.current.project).toEqual(currentInspection);
     expect(result.current.appState).toEqual(
       createAppState({
         last_project_path: other.path,
         recent_projects: [other, current],
       })
     );
-    expect(result.current.wizardDraft).toEqual(
-      expect.objectContaining({
-        project_name: "beta",
-        commands: [
-          expect.objectContaining({
-            cmd: "npm run dev",
-            enabled: true,
-          }),
-        ],
-      })
-    );
-    expect(invokeMock).not.toHaveBeenCalledWith("open_project_window", {
+    expect(result.current.wizardDraft).toBeNull();
+    expect(invokeMock).toHaveBeenCalledWith("open_project_window", {
       projectPath: other.path,
     });
     expect(invokeMock).toHaveBeenCalledWith("save_app_state", {
@@ -1170,5 +1159,125 @@ describe("App workspace integration", () => {
     expect(openFolder).toHaveBeenCalledTimes(2);
 
     sessionSpy.mockRestore();
+  });
+
+  it("keeps existing workspace terminals alive when open folder targets a configless project", async () => {
+    const currentProject = createInspection();
+    const targetProject = createInspection({
+      name: "beta",
+      path: "/projects/beta",
+      has_config: false,
+      script_hints: ["npm run dev"],
+    });
+
+    let allowOpenFolder = false;
+    let inspectCalls = 0;
+    let saveCalls = 0;
+    let spawnCalls = 0;
+
+    invokeMock.mockImplementation(async (command) => {
+      switch (command) {
+        case "load_app_state":
+          return createAppState({
+            last_project_path: currentProject.path,
+            recent_projects: [createRecentProject()],
+          });
+        case "inspect_project_folder":
+          inspectCalls += 1;
+          if (inspectCalls === 1) {
+            return currentProject;
+          }
+          if (inspectCalls === 2 && allowOpenFolder) {
+            return targetProject;
+          }
+          throw new Error(`Unexpected inspect_project_folder call ${inspectCalls}`);
+        case "get_current_project_window":
+          return createCurrentWindow({
+            project_path: currentProject.path,
+          });
+        case "bind_current_project_window":
+          return createCurrentWindow({
+            project_path: currentProject.path,
+          });
+        case "save_app_state":
+          saveCalls += 1;
+          if (saveCalls === 1) {
+            return createAppState({
+              last_project_path: currentProject.path,
+              recent_projects: [createRecentProject()],
+            });
+          }
+          if (saveCalls === 2 && allowOpenFolder) {
+            return createAppState({
+              last_project_path: targetProject.path,
+              recent_projects: [
+                createRecentProject({
+                  name: targetProject.name,
+                  path: targetProject.path,
+                }),
+                createRecentProject(),
+              ],
+            });
+          }
+          throw new Error(`Unexpected save_app_state call ${saveCalls}`);
+        case "get_config":
+          return createMakiConfig();
+        case "get_git_status":
+          return {
+            branch: "main",
+            dirty: false,
+            is_repo: true,
+          };
+        case "spawn_pty":
+          spawnCalls += 1;
+          return 40 + spawnCalls;
+        case "open_folder_dialog":
+          if (!allowOpenFolder) {
+            throw new Error("open_folder_dialog called before user action");
+          }
+          return targetProject.path;
+        case "open_project_window":
+          return {
+            project_path: targetProject.path,
+            window_label: "project-9",
+            created: true,
+          };
+        default:
+          throw new Error(`Unexpected invoke(${command})`);
+      }
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      const spawnCalls = invokeMock.mock.calls.filter(
+        ([command]) => command === "spawn_pty"
+      );
+      expect(spawnCalls).toHaveLength(2);
+    });
+
+    expect(invokeMock).not.toHaveBeenCalledWith("open_folder_dialog");
+
+    allowOpenFolder = true;
+
+    fireEvent.keyDown(window, {
+      key: "o",
+      metaKey: true,
+    });
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("open_project_window", {
+        projectPath: targetProject.path,
+      });
+    });
+
+    expect(screen.getByRole("button", { name: /open folder/i })).toBeInTheDocument();
+    expect(screen.queryByText(/set up beta/i)).not.toBeInTheDocument();
+    expect(invokeMock).not.toHaveBeenCalledWith("kill_pty", {
+      sessionId: 41,
+    });
+    expect(invokeMock).not.toHaveBeenCalledWith("kill_pty", {
+      sessionId: 42,
+    });
   });
 });

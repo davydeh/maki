@@ -374,12 +374,19 @@ export function useWorkspaceSession(): WorkspaceSessionState {
           return;
         }
 
-        if (!inspection.has_config) {
-          await enterWizardLocally(currentAppState, inspection);
-          return;
-        }
-
         if (!currentProject || currentProject.path !== inspection.path) {
+          if (currentProject) {
+            await routeToProjectWindow(inspection.path);
+            await persistAppState(currentAppState, inspection);
+            setRestoreError(null);
+            return;
+          }
+
+          if (!inspection.has_config) {
+            await enterWizardLocally(currentAppState, inspection);
+            return;
+          }
+
           await routeToProjectWindow(inspection.path);
           await persistAppState(currentAppState, inspection);
           setRestoreError(null);
