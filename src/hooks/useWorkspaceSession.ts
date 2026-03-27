@@ -220,18 +220,25 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         return;
       }
 
-      await invoke<string>("save_config", toSaveConfigRequest(project.path, draftToSave));
+      try {
+        await invoke<string>("save_config", toSaveConfigRequest(project.path, draftToSave));
 
-      const refreshedInspection = await inspectProject(project.path);
-      setProject(refreshedInspection);
+        const refreshedInspection = await inspectProject(project.path);
+        setProject(refreshedInspection);
 
-      if (!refreshedInspection.has_config) {
+        if (!refreshedInspection.has_config) {
+          setWizardDraft(draftToSave);
+          setScreen("wizard");
+          return;
+        }
+
+        await enterWorkspaceLocally(appState, refreshedInspection);
+      } catch (error) {
+        setProject(project);
         setWizardDraft(draftToSave);
+        setRestoreError(toErrorMessage(error));
         setScreen("wizard");
-        return;
       }
-
-      await enterWorkspaceLocally(appState, refreshedInspection);
     },
     [appState, enterWorkspaceLocally, inspectProject, project, wizardDraft]
   );

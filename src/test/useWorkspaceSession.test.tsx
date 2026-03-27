@@ -401,6 +401,43 @@ describe("useWorkspaceSession", () => {
     expect(result.current.project).toEqual(savedInspection);
   });
 
+  it("keeps wizard state and surfaces backend errors when local binding fails after save", async () => {
+    const state = createAppState({
+      last_project_path: "/projects/alpha",
+      recent_projects: [createRecentProject()],
+    });
+    const inspection = createInspection({
+      has_config: false,
+      script_hints: ["npm run dev"],
+    });
+    const savedInspection = createInspection({
+      has_config: true,
+    });
+    const draft = createWizardDraft();
+
+    mockInvoke({
+      load_app_state: state,
+      inspect_project_folder: [inspection, savedInspection],
+      save_config: "/projects/alpha/maki.yaml",
+      bind_current_project_window: new Error("Binding current project window failed"),
+    });
+
+    const { result } = renderHook(() => useWorkspaceSession());
+
+    await waitFor(() => {
+      expect(result.current.screen).toBe("wizard");
+    });
+
+    await act(async () => {
+      await result.current.saveWizardConfig(draft);
+    });
+
+    expect(result.current.screen).toBe("wizard");
+    expect(result.current.restoreError).toBe("Binding current project window failed");
+    expect(result.current.wizardDraft).toEqual(draft);
+    expect(result.current.appState).toEqual(state);
+  });
+
   it("opens a new project window when selecting a different recent project", async () => {
     const recentA = createRecentProject();
     const recentB = createRecentProject({
