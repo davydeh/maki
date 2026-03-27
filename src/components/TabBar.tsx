@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Terminal, Plus } from "lucide-react";
 import type { Tab } from "../types";
 import type { Theme } from "../themes";
 
@@ -23,111 +24,134 @@ export function TabBar({
   onOpenFolder,
   onNewTab,
 }: TabBarProps) {
+  const shells = tabs.filter((t) => t.type === "shell");
+  const commands = tabs.filter((t) => t.type === "process");
+
   return (
     <div
       style={{
         display: "flex",
-        alignItems: "center",
+        flexDirection: "column",
         backgroundColor: theme.tabBarBg,
-        height: "36px",
-        padding: "0 8px",
-        gap: "1px",
         userSelect: "none",
-        borderBottom: `1px solid ${theme.border}`,
       }}
-      data-tauri-drag-region
     >
-      {tabs.map((tab) => (
-        <TabItem
-          key={tab.id}
-          tab={tab}
-          isActive={tab.id === activeTabId}
-          theme={theme}
-          onTabClick={onTabClick}
-          onTabClose={onTabClose}
-          onToggleProcess={onToggleProcess}
-        />
-      ))}
-
-      <div style={{ flex: 1 }} data-tauri-drag-region />
-
-      <button
-        onClick={onOpenFolder}
+      {/* Row 1: Shell tabs (browser tabs) */}
+      <div
         style={{
-          background: "none",
-          border: "none",
-          color: theme.tabFg,
-          cursor: "pointer",
-          fontSize: "11px",
-          padding: "4px 8px",
-          lineHeight: 1,
-          opacity: 0.7,
+          display: "flex",
+          alignItems: "center",
+          height: "36px",
+          padding: "0 8px",
+          gap: "1px",
+          borderBottom: `1px solid ${theme.border}`,
         }}
-        title="Open Folder... (Cmd+O)"
+        data-tauri-drag-region
       >
-        Open Folder...
-      </button>
+        {shells.map((tab) => (
+          <ShellTab
+            key={tab.id}
+            tab={tab}
+            isActive={tab.id === activeTabId}
+            theme={theme}
+            onTabClick={onTabClick}
+            onTabClose={onTabClose}
+          />
+        ))}
 
-      <button
-        onClick={onNewTab}
-        style={{
-          background: "none",
-          border: "none",
-          color: theme.tabFg,
-          cursor: "pointer",
-          fontSize: "16px",
-          padding: "4px 8px",
-          lineHeight: 1,
-          opacity: 0.7,
-        }}
-        title="New tab (Cmd+T)"
-      >
-        +
-      </button>
+        <button
+          onClick={onNewTab}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "28px",
+            height: "28px",
+            background: "none",
+            border: "none",
+            color: theme.tabFg,
+            cursor: "pointer",
+            borderRadius: "6px",
+            opacity: 0.5,
+          }}
+          title="New shell (Cmd+T)"
+        >
+          <Plus size={14} />
+        </button>
+
+        <div style={{ flex: 1 }} data-tauri-drag-region />
+
+        <button
+          onClick={onOpenFolder}
+          style={{
+            background: "none",
+            border: "none",
+            color: theme.tabFg,
+            cursor: "pointer",
+            fontSize: "11px",
+            padding: "4px 8px",
+            lineHeight: 1,
+            opacity: 0.5,
+          }}
+          title="Open Folder... (Cmd+O)"
+        >
+          Open Folder...
+        </button>
+      </div>
+
+      {/* Row 2: Command bookmarks bar */}
+      {commands.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            height: "28px",
+            padding: "0 10px",
+            gap: "2px",
+            borderBottom: `1px solid ${theme.border}`,
+            fontSize: "11px",
+          }}
+        >
+          {commands.map((tab) => (
+            <CommandBookmark
+              key={tab.id}
+              tab={tab}
+              isActive={tab.id === activeTabId}
+              theme={theme}
+              onTabClick={onTabClick}
+              onToggleProcess={onToggleProcess}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function TabItem({
+/* Shell tab — browser-tab style */
+function ShellTab({
   tab,
   isActive,
   theme,
   onTabClick,
   onTabClose,
-  onToggleProcess,
 }: {
   tab: Tab;
   isActive: boolean;
   theme: Theme;
   onTabClick: (id: string) => void;
   onTabClose: (id: string) => void;
-  onToggleProcess: (id: string) => void;
 }) {
-  const [hovered, setHovered] = useState(false);
-
-  const isShell = tab.type === "shell";
-  const isRunning = tab.status === "running";
-  const isErrored = tab.status === "errored";
-  const isStopped = tab.status === "stopped";
-
-  // Status dot color
-  const dotColor = isRunning
-    ? theme.running
-    : isErrored
-    ? theme.errored
-    : theme.stopped;
-
   return (
     <div
       onClick={() => onTabClick(tab.id)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "7px",
-        padding: "4px 14px",
+        gap: "6px",
+        padding: "4px 12px",
         minWidth: "100px",
+        maxWidth: "200px",
         borderRadius: "6px",
         backgroundColor: isActive ? theme.activeTabBg : "transparent",
         color: isActive ? theme.activeTabFg : theme.tabFg,
@@ -137,53 +161,7 @@ function TabItem({
         transition: "background-color 100ms ease",
       }}
     >
-      {/* Status indicator: dot normally, action icon on hover for processes */}
-      {!isShell && hovered && (isRunning || isErrored || isStopped) ? (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleProcess(tab.id);
-          }}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "16px",
-            height: "16px",
-            padding: 0,
-            border: `1px solid ${theme.stopped}`,
-            borderRadius: "3px",
-            background: "none",
-            color: isRunning ? theme.stopped : theme.running,
-            cursor: "pointer",
-            fontSize: "8px",
-            lineHeight: 1,
-            flexShrink: 0,
-          }}
-          title={isRunning ? "Stop" : "Start"}
-        >
-          {isRunning ? "■" : "▶"}
-        </button>
-      ) : (
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: isShell ? "auto" : "7px",
-            height: isShell ? "auto" : "7px",
-            borderRadius: "50%",
-            backgroundColor: isShell ? "transparent" : dotColor,
-            color: isShell ? theme.shell : undefined,
-            fontSize: isShell ? "11px" : undefined,
-            lineHeight: 1,
-            flexShrink: 0,
-          }}
-        >
-          {isShell ? "$" : ""}
-        </span>
-      )}
-
+      <Terminal size={12} style={{ opacity: 0.5, flexShrink: 0 }} />
       <span
         style={{
           overflow: "hidden",
@@ -193,7 +171,6 @@ function TabItem({
       >
         {tab.name}
       </span>
-
       {isActive && (
         <button
           onClick={(e) => {
@@ -216,6 +193,93 @@ function TabItem({
           ×
         </button>
       )}
+    </div>
+  );
+}
+
+/* Command bookmark — compact status item */
+function CommandBookmark({
+  tab,
+  isActive,
+  theme,
+  onTabClick,
+  onToggleProcess,
+}: {
+  tab: Tab;
+  isActive: boolean;
+  theme: Theme;
+  onTabClick: (id: string) => void;
+  onToggleProcess: (id: string) => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  const isRunning = tab.status === "running";
+  const isErrored = tab.status === "errored";
+
+  const dotColor = isRunning
+    ? theme.running
+    : isErrored
+    ? theme.errored
+    : theme.stopped;
+
+  return (
+    <div
+      onClick={() => onTabClick(tab.id)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "5px",
+        padding: "2px 8px",
+        borderRadius: "4px",
+        backgroundColor: isActive ? theme.activeTabBg : "transparent",
+        color: isActive ? theme.activeTabFg : theme.tabFg,
+        cursor: "pointer",
+        fontWeight: isActive ? 600 : 400,
+        transition: "background-color 100ms ease",
+      }}
+    >
+      {/* Status dot or toggle button on hover */}
+      {hovered ? (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleProcess(tab.id);
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "14px",
+            height: "14px",
+            padding: 0,
+            border: `1px solid ${theme.stopped}`,
+            borderRadius: "3px",
+            background: "none",
+            color: isRunning ? theme.stopped : theme.running,
+            cursor: "pointer",
+            fontSize: "7px",
+            lineHeight: 1,
+            flexShrink: 0,
+          }}
+          title={isRunning ? "Stop" : "Start"}
+        >
+          {isRunning ? "■" : "▶"}
+        </button>
+      ) : (
+        <span
+          style={{
+            display: "inline-block",
+            width: "6px",
+            height: "6px",
+            borderRadius: "50%",
+            backgroundColor: dotColor,
+            flexShrink: 0,
+          }}
+        />
+      )}
+      <span>{tab.name}</span>
     </div>
   );
 }
