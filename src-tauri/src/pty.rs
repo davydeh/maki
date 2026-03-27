@@ -102,39 +102,85 @@ pub fn spawn_pty(
 }
 
 fn read_pty_output(mut reader: Box<dyn Read + Send>, session_id: u32, app: AppHandle) {
-    // 64KB buffer: large enough to capture a full TUI screen redraw in one read
     let mut buf = [0u8; 65536];
+    // Carry-over buffer for incomplete UTF-8 sequences split across reads.
+    // A UTF-8 character is at most 4 bytes, so 4 bytes is sufficient.
+    let mut carry = [0u8; 4];
+    let mut carry_len: usize = 0;
+
     loop {
-        match reader.read(&mut buf) {
+        // Place any leftover bytes at the start of the buffer
+        buf[..carry_len].copy_from_slice(&carry[..carry_len]);
+
+        match reader.read(&mut buf[carry_len..]) {
             Ok(0) => {
-                let _ = app.emit(
-                    "pty-exit",
-                    PtyExit {
-                        session_id,
-                        exit_code: 0,
-                    },
-                );
+                // Flush any remaining carry bytes (incomplete sequence at EOF)
+                if carry_len > 0 {
+                    let text = String::from_utf8_lossy(&buf[..carry_len]).into_owned();
+                    let _ = app.emit("pty-output", &PtyOutput { session_id, data: text });
+                }
+                let _ = app.emit("pty-exit", PtyExit { session_id, exit_code: 0 });
                 break;
             }
             Ok(n) => {
-                // Send as UTF-8 string directly -- avoids JSON number-array overhead
-                // (lossy conversion handles rare non-UTF-8 bytes gracefully)
-                let text = String::from_utf8_lossy(&buf[..n]).into_owned();
-                let output = PtyOutput {
-                    session_id,
-                    data: text,
-                };
-                let _ = app.emit("pty-output", &output);
+                let total = carry_len + n;
+                carry_len = 0;
+
+                // Find the last valid UTF-8 boundary. Walk backwards from the
+                // end to find any incomplete multi-byte sequence.
+                let valid_end = find_utf8_safe_boundary(&buf[..total]);
+                let tail = total - valid_end;
+
+                if tail > 0 && tail <= 4 {
+                    // Save the incomplete trailing bytes for the next read
+                    carry[..tail].copy_from_slice(&buf[valid_end..total]);
+                    carry_len = tail;
+                }
+
+                if valid_end > 0 {
+                    // Safety: valid_end is a valid UTF-8 boundary
+                    let text = unsafe { std::str::from_utf8_unchecked(&buf[..valid_end]) };
+                    let _ = app.emit("pty-output", &PtyOutput {
+                        session_id,
+                        data: text.to_owned(),
+                    });
+                }
             }
             Err(_) => {
-                let _ = app.emit(
-                    "pty-exit",
-                    PtyExit {
-                        session_id,
-                        exit_code: -1,
-                    },
-                );
+                let _ = app.emit("pty-exit", PtyExit { session_id, exit_code: -1 });
                 break;
+            }
+        }
+    }
+}
+
+/// Find the largest prefix of `data` that is valid UTF-8. If the last few
+/// bytes are the start of a multi-byte sequence that is incomplete, return
+/// the position just before them so the caller can carry them to the next read.
+fn find_utf8_safe_boundary(data: &[u8]) -> usize {
+    // std::str::from_utf8 tells us where an error starts. We only need to
+    // check the last 3 bytes at most (max UTF-8 char is 4 bytes).
+    match std::str::from_utf8(data) {
+        Ok(_) => data.len(), // All valid
+        Err(e) => {
+            let valid = e.valid_up_to();
+            // Check if the error is an incomplete sequence at the very end
+            // (as opposed to genuinely invalid bytes in the middle).
+            if e.error_len().is_none() {
+                // Incomplete sequence at end — return the valid prefix
+                valid
+            } else {
+                // Invalid byte in the middle — include it (lossy) and keep going.
+                // This handles genuinely malformed output by skipping bad bytes.
+                // Find the next safe point after the bad byte(s).
+                let skip = e.error_len().unwrap();
+                let after = valid + skip;
+                if after >= data.len() {
+                    data.len()
+                } else {
+                    // Recursively find the boundary in the remaining data
+                    after + find_utf8_safe_boundary(&data[after..])
+                }
             }
         }
     }
