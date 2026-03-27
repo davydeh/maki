@@ -13,7 +13,7 @@ import { TabBar } from "./components/TabBar";
 import { TerminalView } from "./components/TerminalView";
 import { useWorkspaceSession } from "./hooks/useWorkspaceSession";
 import { getTheme, type Theme } from "./themes";
-import type { GitStatus, MakiConfig, Tab } from "./types";
+import type { GitStatus, LoadedWorkspaceConfig, MakiConfig, Tab } from "./types";
 
 let nextId = 0;
 
@@ -36,6 +36,43 @@ function createShellVars(theme: Theme): CSSProperties {
     "--shell-border": theme.border,
     "--shell-danger": theme.errored,
   } as CSSProperties;
+}
+
+function createTabsFromConfig(config: MakiConfig, projectRoot: string): Tab[] {
+  const shell = "/bin/zsh";
+  const nextTabs: Tab[] = [];
+
+  for (const proc of config.processes) {
+    nextTabs.push({
+      id: genId(),
+      name: proc.name,
+      type: "process",
+      cmd: shell,
+      args: ["-c", proc.cmd],
+      status: proc.autostart ? "running" : "stopped",
+      autostart: proc.autostart,
+      workspacePath: projectRoot,
+      cwd: proc.cwd || projectRoot,
+      env: proc.env,
+    });
+  }
+
+  for (const sh of config.shells) {
+    const shellCommand = sh.cmd || shell;
+    nextTabs.push({
+      id: genId(),
+      name: sh.name,
+      type: "shell",
+      cmd: shellCommand,
+      args: [],
+      status: "running",
+      autostart: true,
+      workspacePath: projectRoot,
+      cwd: projectRoot,
+    });
+  }
+
+  return nextTabs;
 }
 
 interface ShellViewProps {
@@ -62,18 +99,19 @@ function ShellView({ theme, title, description, children }: ShellViewProps) {
 
 export default function App() {
   const session = useWorkspaceSession();
-  const projectRoot = session.project?.path ?? "";
-  const [config, setConfig] = useState<MakiConfig | null>(null);
+  const projectRoot =
+    session.screen === "workspace" && session.project ? session.project.path : "";
+  const [workspaceConfig, setWorkspaceConfig] = useState<LoadedWorkspaceConfig | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState("");
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
 
-  const theme = getTheme(config?.theme);
+  const theme = getTheme(workspaceConfig?.config.theme);
 
   useEffect(() => {
     if (session.screen !== "workspace" || !projectRoot) {
-      setConfig(null);
+      setWorkspaceConfig(null);
       setConfigError(null);
       setTabs([]);
       setActiveTabId("");
@@ -83,7 +121,7 @@ export default function App() {
 
     let cancelled = false;
 
-    setConfig(null);
+    setWorkspaceConfig(null);
     setConfigError(null);
     setTabs([]);
     setActiveTabId("");
@@ -96,10 +134,17 @@ export default function App() {
         });
 
         if (!cancelled) {
-          setConfig(nextConfig);
+          const nextTabs = createTabsFromConfig(nextConfig, projectRoot);
+          setWorkspaceConfig({
+            projectRoot,
+            config: nextConfig,
+          });
+          setTabs(nextTabs);
+          setActiveTabId(nextTabs[0]?.id ?? "");
         }
       } catch (error) {
         if (!cancelled) {
+          setWorkspaceConfig(null);
           setConfigError(toErrorMessage(error));
         }
       }
@@ -109,47 +154,6 @@ export default function App() {
       cancelled = true;
     };
   }, [projectRoot, session.screen]);
-
-  useEffect(() => {
-    if (!config || tabs.length > 0) {
-      return;
-    }
-
-    const shell = "/bin/zsh";
-    const nextTabs: Tab[] = [];
-
-    for (const proc of config.processes) {
-      nextTabs.push({
-        id: genId(),
-        name: proc.name,
-        type: "process",
-        cmd: shell,
-        args: ["-c", proc.cmd],
-        status: proc.autostart ? "running" : "stopped",
-        autostart: proc.autostart,
-        cwd: proc.cwd,
-        env: proc.env,
-      });
-    }
-
-    for (const sh of config.shells) {
-      const shellCommand = sh.cmd || shell;
-      nextTabs.push({
-        id: genId(),
-        name: sh.name,
-        type: "shell",
-        cmd: shellCommand,
-        args: [],
-        status: "running",
-        autostart: true,
-      });
-    }
-
-    setTabs(nextTabs);
-    if (nextTabs.length > 0) {
-      setActiveTabId(nextTabs[0].id);
-    }
-  }, [config, tabs.length]);
 
   useEffect(() => {
     if (session.screen !== "workspace" || !projectRoot) {
@@ -215,11 +219,17 @@ export default function App() {
       args: [],
       status: "running",
       autostart: true,
+      workspacePath: projectRoot,
+      cwd: projectRoot,
     };
 
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(id);
-  }, []);
+  }, [projectRoot]);
+
+  const handleOpenFolder = useCallback(() => {
+    void session.openFolder();
+  }, [session]);
 
   const handleSessionCreated = useCallback((tabId: string, sessionId: number) => {
     setTabs((prev) =>
@@ -255,6 +265,11 @@ export default function App() {
         }
       }
 
+      if (event.metaKey && event.key === "o") {
+        event.preventDefault();
+        handleOpenFolder();
+      }
+
       if (event.metaKey && event.key >= "1" && event.key <= "9") {
         event.preventDefault();
         const index = parseInt(event.key, 10) - 1;
@@ -266,7 +281,7 @@ export default function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeTabId, session.screen, tabs, handleNewTab, handleTabClose]);
+  }, [activeTabId, handleNewTab, handleOpenFolder, handleTabClose, session.screen, tabs]);
 
   if (session.screen === "picker" || session.screen === "invalid") {
     return (
@@ -360,7 +375,7 @@ export default function App() {
     );
   }
 
-  if (!config) {
+  if (!workspaceConfig) {
     return (
       <ShellView
         theme={theme}
@@ -390,6 +405,7 @@ export default function App() {
         onTabClick={handleTabClick}
         onTabClose={handleTabClose}
         onToggleProcess={handleToggleProcess}
+        onOpenFolder={handleOpenFolder}
         onNewTab={handleNewTab}
       />
 
@@ -400,18 +416,24 @@ export default function App() {
             tabId={tab.id}
             cmd={tab.cmd}
             args={tab.args}
-            cwd={tab.cwd || projectRoot}
+            cwd={tab.cwd || tab.workspacePath || projectRoot}
             env={tab.env}
             theme={theme}
             autostart={tab.autostart}
             active={tab.id === activeTabId}
+            workspaceActive={session.screen === "workspace"}
             onSessionCreated={handleSessionCreated}
             onExit={handleExit}
           />
         ))}
       </div>
 
-      <StatusBar tabs={tabs} gitStatus={gitStatus} theme={theme} />
+      <StatusBar
+        tabs={tabs}
+        gitStatus={gitStatus}
+        projectPath={projectRoot}
+        theme={theme}
+      />
     </div>
   );
 }

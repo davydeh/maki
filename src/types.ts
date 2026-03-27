@@ -101,6 +101,11 @@ export interface ShellConfig {
   cmd?: string;
 }
 
+export interface LoadedWorkspaceConfig {
+  projectRoot: string;
+  config: MakiConfig;
+}
+
 export type TabType = "process" | "shell";
 export type TabStatus = "running" | "stopped" | "errored";
 
@@ -114,6 +119,7 @@ export interface Tab {
   exitCode?: number;
   autostart: boolean;
   sessionId?: number;
+  workspacePath?: string;
   cwd?: string;
   env?: Record<string, string>;
 }

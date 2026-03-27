@@ -84,22 +84,21 @@ function normalizeCommandName(command: string): string {
 
   const pythonModuleMatch = trimmed.match(/^python -m ([^\s]+)$/);
   if (pythonModuleMatch) {
-    return pythonModuleMatch[1].split(".").at(-1) ?? pythonModuleMatch[1];
+    const moduleSegments = pythonModuleMatch[1].split(".");
+    return moduleSegments[moduleSegments.length - 1] ?? pythonModuleMatch[1];
   }
 
   const pythonFileMatch = trimmed.match(/^python ([^\s]+)$/);
   if (pythonFileMatch) {
-    const fileName = pythonFileMatch[1].split("/").at(-1) ?? pythonFileMatch[1];
+    const pathSegments = pythonFileMatch[1].split("/");
+    const fileName = pathSegments[pathSegments.length - 1] ?? pythonFileMatch[1];
     return fileName.replace(/\.[^.]+$/, "");
   }
 
-  return (
-    trimmed
-      .split(/\s+/)
-      .at(-1)
-      ?.replace(/[^a-zA-Z0-9:_-]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "process"
-  );
+  const segments = trimmed.split(/\s+/);
+  const tailSegment = segments[segments.length - 1];
+
+  return tailSegment?.replace(/[^a-zA-Z0-9:_-]+/g, "-").replace(/^-+|-+$/g, "") || "process";
 }
 
 function buildWizardDraft(inspection: ProjectInspection): WizardDraft {

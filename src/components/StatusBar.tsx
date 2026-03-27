@@ -4,10 +4,11 @@ import type { Theme } from "../themes";
 interface StatusBarProps {
   tabs: Tab[];
   gitStatus: GitStatus | null;
+  projectPath: string;
   theme: Theme;
 }
 
-export function StatusBar({ tabs, gitStatus, theme }: StatusBarProps) {
+export function StatusBar({ tabs, gitStatus, projectPath, theme }: StatusBarProps) {
   const running = tabs.filter((t) => t.status === "running").length;
   const errored = tabs.filter((t) => t.status === "errored").length;
   const stopped = tabs.filter((t) => t.status === "stopped").length;
@@ -26,7 +27,20 @@ export function StatusBar({ tabs, gitStatus, theme }: StatusBarProps) {
         borderTop: `1px solid ${theme.border}`,
       }}
     >
-      <div style={{ display: "flex", gap: "12px" }}>
+      <div style={{ display: "flex", gap: "12px", minWidth: 0 }}>
+        {projectPath && (
+          <span
+            style={{
+              maxWidth: "280px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={projectPath}
+          >
+            {projectPath}
+          </span>
+        )}
         {gitStatus?.is_repo && (
           <span>
             ⎇ {gitStatus.branch} {gitStatus.dirty ? "●" : "○"}

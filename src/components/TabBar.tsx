@@ -8,6 +8,7 @@ interface TabBarProps {
   onTabClick: (id: string) => void;
   onTabClose: (id: string) => void;
   onToggleProcess: (id: string) => void;
+  onOpenFolder: () => void;
   onNewTab: () => void;
 }
 
@@ -18,6 +19,7 @@ export function TabBar({
   onTabClick,
   onTabClose,
   onToggleProcess,
+  onOpenFolder,
   onNewTab,
 }: TabBarProps) {
   return (
@@ -109,6 +111,24 @@ export function TabBar({
           </div>
         );
       })}
+
+      <div style={{ flex: 1 }} />
+
+      <button
+        onClick={onOpenFolder}
+        style={{
+          background: "none",
+          border: "none",
+          color: theme.tabFg,
+          cursor: "pointer",
+          fontSize: "11px",
+          padding: "4px 8px",
+          lineHeight: 1,
+        }}
+        title="Open Folder... (Cmd+O)"
+      >
+        Open Folder...
+      </button>
 
       <button
         onClick={onNewTab}

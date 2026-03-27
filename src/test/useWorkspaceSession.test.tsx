@@ -1,8 +1,15 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useWorkspaceSession } from "../hooks/useWorkspaceSession";
+import App from "../App";
+import * as workspaceSessionModule from "../hooks/useWorkspaceSession";
+import {
+  useWorkspaceSession,
+  type WorkspaceSessionState,
+} from "../hooks/useWorkspaceSession";
 import type {
+  MakiConfig,
   DetectedCommand,
   ProjectInspection,
   ProjectWindowContext,
@@ -16,7 +23,49 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+const { MockTerminal, MockFitAddon, MockWebglAddon } = vi.hoisted(() => {
+  class MockTerminal {
+    cols = 120;
+    rows = 32;
+
+    loadAddon() {}
+    open() {}
+    onData() {}
+    onResize() {}
+    write() {}
+    dispose() {}
+  }
+
+  class MockFitAddon {
+    fit() {}
+  }
+
+  class MockWebglAddon {
+    onContextLoss() {}
+    dispose() {}
+  }
+
+  return { MockTerminal, MockFitAddon, MockWebglAddon };
+});
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(),
+}));
+
+vi.mock("@xterm/xterm", () => ({
+  Terminal: MockTerminal,
+}));
+
+vi.mock("@xterm/addon-fit", () => ({
+  FitAddon: MockFitAddon,
+}));
+
+vi.mock("@xterm/addon-webgl", () => ({
+  WebglAddon: MockWebglAddon,
+}));
+
 const invokeMock = vi.mocked(invoke);
+const listenMock = vi.mocked(listen);
 
 type CommandResponse = unknown | Error;
 
@@ -93,6 +142,56 @@ function createWizardDraft(overrides: Partial<WizardDraft> = {}): WizardDraft {
   };
 }
 
+function createMakiConfig(overrides: Partial<MakiConfig> = {}): MakiConfig {
+  return {
+    name: "alpha",
+    theme: "dark",
+    processes: [
+      {
+        name: "web",
+        cmd: "npm run dev",
+        autostart: true,
+      },
+    ],
+    shells: [
+      {
+        name: "shell",
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function createSessionState(
+  overrides: Partial<WorkspaceSessionState> = {}
+): WorkspaceSessionState {
+  return {
+    screen: "picker",
+    appState: createAppState(),
+    project: null,
+    restoreError: null,
+    wizardDraft: null,
+    wizardPreview: null,
+    wizardPreviewError: null,
+    wizardPreviewPending: false,
+    wizardPreviewDirty: false,
+    wizardSavePending: false,
+    openFolder: vi.fn(async () => {}),
+    openRecentProject: vi.fn(async () => {}),
+    addWizardCommand: vi.fn(),
+    updateWizardCommand: vi.fn(),
+    refreshWizardPreview: vi.fn(async () => {}),
+    saveWizardConfig: vi.fn(async () => {}),
+    ...overrides,
+  };
+}
+
+async function flushEffects() {
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
+
 function mockInvoke(
   responses: Partial<Record<string, CommandResponse | CommandResponse[]>>
 ) {
@@ -121,6 +220,8 @@ function mockInvoke(
 describe("useWorkspaceSession", () => {
   beforeEach(() => {
     invokeMock.mockReset();
+    listenMock.mockReset();
+    listenMock.mockResolvedValue(vi.fn());
   });
 
   it("restores the last project into workspace state when config exists", async () => {
@@ -864,5 +965,210 @@ describe("useWorkspaceSession", () => {
     expect(result.current.appState).toEqual(state);
     expect(result.current.restoreError).toBe("Focusing project window failed");
     expect(result.current.screen).toBe("invalid");
+  });
+});
+
+describe("App workspace integration", () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+    listenMock.mockReset();
+    listenMock.mockResolvedValue(vi.fn());
+  });
+
+  it("loads config and initializes tabs after wizard save", async () => {
+    const project = createInspection({
+      has_config: true,
+      script_hints: ["npm run dev"],
+    });
+    const config = createMakiConfig();
+    let sessionState = createSessionState({
+      screen: "wizard",
+      project,
+      wizardDraft: createWizardDraft(),
+      wizardPreview: "name: alpha",
+    });
+
+    const sessionSpy = vi
+      .spyOn(workspaceSessionModule, "useWorkspaceSession")
+      .mockImplementation(() => sessionState);
+
+    mockInvoke({
+      get_config: config,
+      spawn_pty: [11, 12],
+    });
+
+    const { rerender } = render(<App />);
+
+    expect(invokeMock).not.toHaveBeenCalledWith(
+      "get_config",
+      expect.objectContaining({
+        path: `${project.path}/maki.yaml`,
+      })
+    );
+
+    sessionState = createSessionState({
+      screen: "workspace",
+      project,
+    });
+
+    rerender(<App />);
+
+    expect(await screen.findByText("web")).toBeInTheDocument();
+    expect(screen.getByText("shell")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("get_config", {
+        path: `${project.path}/maki.yaml`,
+      });
+    });
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith(
+        "spawn_pty",
+        expect.objectContaining({
+          cmd: "/bin/zsh",
+          args: ["-c", "npm run dev"],
+          cwd: project.path,
+        })
+      );
+      expect(invokeMock).toHaveBeenCalledWith(
+        "spawn_pty",
+        expect.objectContaining({
+          cmd: "/bin/zsh",
+          args: [],
+          cwd: project.path,
+        })
+      );
+    });
+
+    sessionSpy.mockRestore();
+  });
+
+  it("preserves git polling only when a project root is active", async () => {
+    vi.useFakeTimers();
+
+    const project = createInspection();
+    let sessionState = createSessionState({
+      screen: "booting",
+      project: null,
+    });
+
+    const sessionSpy = vi
+      .spyOn(workspaceSessionModule, "useWorkspaceSession")
+      .mockImplementation(() => sessionState);
+
+    mockInvoke({
+      get_config: createMakiConfig(),
+      get_git_status: [
+        {
+          branch: "main",
+          dirty: false,
+          is_repo: true,
+        },
+        {
+          branch: "main",
+          dirty: true,
+          is_repo: true,
+        },
+      ],
+      spawn_pty: [21, 22],
+    });
+
+    const { rerender } = render(<App />);
+
+    expect(invokeMock).not.toHaveBeenCalledWith(
+      "get_git_status",
+      expect.anything()
+    );
+
+    sessionState = createSessionState({
+      screen: "workspace",
+      project,
+    });
+
+    rerender(<App />);
+
+    await flushEffects();
+
+    expect(invokeMock).toHaveBeenCalledWith("get_git_status", {
+      projectRoot: project.path,
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    await flushEffects();
+
+    const secondPollCalls = invokeMock.mock.calls.filter(
+      ([command]) => command === "get_git_status"
+    );
+    expect(secondPollCalls).toHaveLength(2);
+
+    sessionState = createSessionState({
+      screen: "picker",
+      project: null,
+    });
+
+    rerender(<App />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(15000);
+    });
+
+    await flushEffects();
+
+    const gitCalls = invokeMock.mock.calls.filter(
+      ([command]) => command === "get_git_status"
+    );
+    expect(gitCalls).toHaveLength(2);
+
+    sessionSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it("supports cmd-o from a live workspace shell", async () => {
+    const project = createInspection();
+    const openFolder = vi.fn(async () => {});
+
+    const sessionSpy = vi
+      .spyOn(workspaceSessionModule, "useWorkspaceSession")
+      .mockImplementation(() =>
+        createSessionState({
+          screen: "workspace",
+          project,
+          openFolder,
+        })
+      );
+
+    mockInvoke({
+      get_config: createMakiConfig(),
+      get_git_status: {
+        branch: "main",
+        dirty: false,
+        is_repo: true,
+      },
+      spawn_pty: [31, 32],
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("web")).toBeInTheDocument();
+    });
+
+    const openFolderButton = screen.getByRole("button", {
+      name: /open folder/i,
+    });
+
+    fireEvent.click(openFolderButton);
+    fireEvent.keyDown(window, {
+      key: "o",
+      metaKey: true,
+    });
+
+    expect(openFolder).toHaveBeenCalledTimes(2);
+
+    sessionSpy.mockRestore();
   });
 });

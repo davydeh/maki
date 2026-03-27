@@ -16,6 +16,7 @@ interface TerminalViewProps {
   theme: Theme;
   autostart: boolean;
   active: boolean;
+  workspaceActive: boolean;
   onSessionCreated: (tabId: string, sessionId: number) => void;
   onExit: (tabId: string, exitCode: number) => void;
 }
@@ -29,6 +30,7 @@ export function TerminalView({
   theme,
   autostart,
   active,
+  workspaceActive,
   onSessionCreated,
   onExit,
 }: TerminalViewProps) {
@@ -97,8 +99,8 @@ export function TerminalView({
       );
       unlisteners.push(unlisten2);
 
-      // Spawn PTY if autostart
-      if (autostart) {
+      // Only attach the PTY once this tab belongs to an active workspace.
+      if (autostart && workspaceActive) {
         await spawnPty(term);
       }
     })();
