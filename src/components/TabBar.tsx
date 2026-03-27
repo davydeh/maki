@@ -31,20 +31,24 @@ export function TabBar({
       style={{
         display: "flex",
         alignItems: "center",
+        margin: "0 4px 12px 4px",
+        borderRadius: "999px",
         height: "34px",
-        padding: "0",
-        gap: "0",
+        padding: "2px",
+        gap: "1px",
         background: theme.tabBarBg,
         userSelect: "none",
       }}
       data-tauri-drag-region
     >
-      {shells.map((tab) => (
+      {shells.map((tab, index) => (
         <ShellTab
           key={tab.id}
           tab={tab}
           defaultName={projectName}
           isActive={tab.id === activeTabId}
+          tabIndex={index}
+          isLastTab={index === shells.length - 1}
           theme={theme}
           onTabClick={onTabClick}
           onTabClose={onTabClose}
@@ -141,6 +145,8 @@ function ShellTab({
   defaultName,
   isActive,
   theme,
+  tabIndex,
+  isLastTab,
   onTabClick,
   onTabClose,
 }: {
@@ -148,6 +154,8 @@ function ShellTab({
   defaultName: string;
   isActive: boolean;
   theme: Theme;
+  tabIndex: number;
+  isLastTab: boolean;
   onTabClick: (id: string) => void;
   onTabClose: (id: string) => void;
 }) {
@@ -157,6 +165,7 @@ function ShellTab({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const displayName = customName || defaultName;
+  const isFirstTab = tabIndex === 0;
 
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -182,18 +191,24 @@ function ShellTab({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: "6px",
+        gap: "8px",
         flex: 1,
         minWidth: 0,
         height: "100%",
-        padding: "0 12px",
-        borderRadius: "999px",
-        backgroundColor: isActive ? theme.activeTabBg : "transparent",
+        padding: "0 4px",
+        borderTopLeftRadius: isFirstTab ? "999px" : "0",
+        borderTopRightRadius: isLastTab ? "999px" : "0",
+        borderBottomLeftRadius: isFirstTab ? "999px" : "0",
+        borderBottomRightRadius: isLastTab ? "999px" : "0",
+        backgroundColor: isActive ? theme.activeTabBg : theme.inactiveTabBg,
         color: isActive ? theme.fg : theme.tabFg,
         cursor: "pointer",
         fontSize: "12px",
-        fontWeight: isActive ? 600 : 400,
+        fontWeight: isActive ? 500 : 400,
         transition: "background-color 100ms ease",
+        position: "relative",
+        userSelect: "none",
+        WebkitUserSelect: "none",
       }}
     >
       {editing ? (
@@ -239,13 +254,14 @@ function ShellTab({
             onTabClose(tab.id);
           }}
           style={{
+            position: "absolute",
+            left: "12px",
             background: "none",
             border: "none",
             color: theme.fg,
             cursor: "pointer",
             fontSize: "14px",
-            padding: 0,
-            lineHeight: 1,
+            padding: "0 0 3px 0",
             flexShrink: 0,
             opacity: 0.5,
           }}
@@ -253,6 +269,23 @@ function ShellTab({
         >
           ×
         </button>
+      )}
+
+      {!editing && tabIndex < 10 && (
+        <span
+          style={{
+            position: "absolute",
+            right: "12px",
+            background: "none",
+            color: theme.fg,
+            fontSize: "12px",
+            lineHeight: 1,
+            flexShrink: 0,
+            opacity: 0.5,
+          }}
+        >
+          &#8984;{tabIndex + 1}
+        </span>
       )}
     </div>
   );
@@ -281,8 +314,8 @@ function CommandItem({
   const dotColor = isRunning
     ? theme.running
     : isErrored
-    ? theme.errored
-    : theme.stopped;
+      ? theme.errored
+      : theme.stopped;
 
   return (
     <div

@@ -290,9 +290,10 @@ export default function App() {
 
       if (event.metaKey && event.key >= "1" && event.key <= "9") {
         event.preventDefault();
+        const shellTabs = tabs.filter((t) => t.type === "shell");
         const index = parseInt(event.key, 10) - 1;
-        if (index < tabs.length) {
-          setActiveTabId(tabs[index].id);
+        if (index < shellTabs.length) {
+          setActiveTabId(shellTabs[index].id);
         }
       }
     };
