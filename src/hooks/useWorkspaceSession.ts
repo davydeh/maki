@@ -80,7 +80,7 @@ function buildWizardDraft(inspection: ProjectInspection): WizardDraft {
 function toSaveConfigRequest(projectPath: string, draft: WizardDraft) {
   return {
     request: {
-      projectPath,
+      project_path: projectPath,
       draft: {
         project_name: draft.project_name,
         theme: draft.theme,
@@ -152,8 +152,9 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         }
 
         if (!project || project.path !== inspection.path) {
-          await persistAppState(appState, inspection);
           await routeToProjectWindow(inspection.path);
+          await persistAppState(appState, inspection);
+          setRestoreError(null);
           return;
         }
 
@@ -172,7 +173,6 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         setScreen("wizard");
       } catch (error) {
         setRestoreError(toErrorMessage(error));
-        setScreen("invalid");
       }
     },
     [appState, inspectProject, persistAppState, project, routeToProjectWindow]
@@ -279,18 +279,6 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         if (currentWindow && currentWindow.project_path !== inspection.path) {
           await routeToProjectWindow(inspection.path);
           return;
-        }
-
-        if (!currentWindow) {
-          const windowResult = await routeToProjectWindow(inspection.path);
-
-          if (cancelled) {
-            return;
-          }
-
-          if (!windowResult.created) {
-            return;
-          }
         }
 
         setProject(inspection);
