@@ -117,7 +117,9 @@ function SessionWizardHarness() {
         wizardPreview={session.wizardPreview}
         wizardPreviewError={session.wizardPreviewError}
         wizardPreviewPending={session.wizardPreviewPending}
+        wizardPreviewDirty={session.wizardPreviewDirty}
         wizardSavePending={session.wizardSavePending}
+        onAddCommand={session.addWizardCommand}
         onUpdateCommand={session.updateWizardCommand}
         onRefreshPreview={session.refreshWizardPreview}
         onSave={session.saveWizardConfig}
@@ -194,6 +196,50 @@ describe("ConfigWizardView", () => {
     });
   });
 
+  it("allows manually adding a command when detection finds nothing", async () => {
+    const emptyInspection = createInspection({
+      detected_stacks: [],
+      script_hints: [],
+      entrypoint_hints: [],
+    });
+
+    mockInvoke({
+      load_app_state: createAppState(),
+      inspect_project_folder: emptyInspection,
+      save_app_state: createAppState(),
+      generate_config_preview: [
+        new Error("Config must include at least one enabled command"),
+        "name: alpha\nprocesses:\n  - name: worker\n    cmd: npm run worker\n    autostart: true\n",
+      ],
+    });
+
+    render(<SessionWizardHarness />);
+
+    expect(await screen.findByText(/no framework signals detected/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add command/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save config/i })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /add command/i }));
+
+    const manualRow = await screen.findByTestId("wizard-command-manual-0");
+    fireEvent.change(within(manualRow).getByLabelText("Name"), {
+      target: { value: "worker" },
+    });
+    fireEvent.change(within(manualRow).getByLabelText("Command"), {
+      target: { value: "npm run worker" },
+    });
+
+    expect(screen.getByRole("button", { name: /save config/i })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /refresh preview/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("config-preview")).toHaveTextContent("npm run worker");
+    });
+
+    expect(screen.getByRole("button", { name: /save config/i })).toBeEnabled();
+  });
+
   it("submits save and calls launch transition on success", async () => {
     const missingConfigInspection = createInspection();
     const savedInspection = createInspection({ has_config: true });
@@ -202,8 +248,10 @@ describe("ConfigWizardView", () => {
       load_app_state: createAppState(),
       inspect_project_folder: [missingConfigInspection, savedInspection],
       save_app_state: [createAppState(), createAppState()],
-      generate_config_preview:
+      generate_config_preview: [
         "name: alpha\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
+        "name: alpha\nprocesses:\n  - name: web\n    cmd: npm run dev\n    autostart: true\n",
+      ],
       save_config: "/projects/alpha/maki.yaml",
       bind_current_project_window: createCurrentWindow(),
     });
@@ -213,6 +261,12 @@ describe("ConfigWizardView", () => {
     const firstCommand = await screen.findByTestId("wizard-command-detected-0");
     fireEvent.change(within(firstCommand).getByLabelText("Name"), {
       target: { value: "web" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /refresh preview/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /save config/i })).toBeEnabled();
     });
 
     fireEvent.click(screen.getByRole("button", { name: /save config/i }));
@@ -236,6 +290,44 @@ describe("ConfigWizardView", () => {
     });
   });
 
+  it("blocks save until preview is refreshed after edits", async () => {
+    mockInvoke({
+      load_app_state: createAppState(),
+      inspect_project_folder: createInspection(),
+      save_app_state: createAppState(),
+      generate_config_preview:
+        "name: alpha\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
+    });
+
+    render(<SessionWizardHarness />);
+
+    const firstCommand = await screen.findByTestId("wizard-command-detected-0");
+    fireEvent.change(within(firstCommand).getByLabelText("Name"), {
+      target: { value: "web" },
+    });
+
+    expect(screen.getByText(/preview is out of date/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save config/i })).toBeDisabled();
+    expect(invokeMock).not.toHaveBeenCalledWith("save_config", expect.anything());
+  });
+
+  it("blocks save when preview generation fails", async () => {
+    mockInvoke({
+      load_app_state: createAppState(),
+      inspect_project_folder: createInspection(),
+      save_app_state: createAppState(),
+      generate_config_preview: new Error("Config must include at least one enabled command"),
+    });
+
+    render(<SessionWizardHarness />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Config must include at least one enabled command"
+    );
+    expect(screen.getByRole("button", { name: /save config/i })).toBeDisabled();
+    expect(invokeMock).not.toHaveBeenCalledWith("save_config", expect.anything());
+  });
+
   it("calls the native save command before transitioning into workspace state", async () => {
     const missingConfigInspection = createInspection();
     const savedInspection = createInspection({ has_config: true });
@@ -244,15 +336,23 @@ describe("ConfigWizardView", () => {
       load_app_state: createAppState(),
       inspect_project_folder: [missingConfigInspection, savedInspection],
       save_app_state: [createAppState(), createAppState()],
-      generate_config_preview:
+      generate_config_preview: [
         "name: alpha\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
+        "name: alpha\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
+      ],
       save_config: "/projects/alpha/maki.yaml",
       bind_current_project_window: createCurrentWindow(),
     });
 
     render(<SessionWizardHarness />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /save config/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /refresh preview/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /save config/i })).toBeEnabled();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /save config/i }));
 
     await waitFor(() => {
       expect(screen.getByTestId("session-screen")).toHaveTextContent("workspace");

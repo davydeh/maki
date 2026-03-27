@@ -10,6 +10,7 @@ interface ConfigWizardViewProps {
   wizardPreviewPending: boolean;
   wizardPreviewDirty?: boolean;
   wizardSavePending: boolean;
+  onAddCommand: () => void | Promise<void>;
   onUpdateCommand: (commandId: string, updates: WizardCommandUpdate) => void;
   onRefreshPreview: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
@@ -94,7 +95,15 @@ function formatStackLabel(stack: DetectionSignal["stack"]): string {
 }
 
 function formatSourceLabel(source: string): string {
-  return source === "script_hint" ? "Script Hint" : "Entrypoint Hint";
+  if (source === "script_hint") {
+    return "Script Hint";
+  }
+
+  if (source === "entrypoint_hint") {
+    return "Entrypoint Hint";
+  }
+
+  return "Manual";
 }
 
 export function ConfigWizardView({
@@ -106,12 +115,20 @@ export function ConfigWizardView({
   wizardPreviewPending,
   wizardPreviewDirty = false,
   wizardSavePending,
+  onAddCommand,
   onUpdateCommand,
   onRefreshPreview,
   onSave,
   onOpenFolder,
 }: ConfigWizardViewProps) {
   const enabledCommands = wizardDraft.commands.filter((command) => command.enabled).length;
+  const canSave =
+    enabledCommands > 0 &&
+    !wizardPreviewPending &&
+    !wizardSavePending &&
+    !wizardPreviewDirty &&
+    !wizardPreviewError &&
+    Boolean(wizardPreview);
 
   return (
     <div className="shell-screen">
@@ -163,10 +180,30 @@ export function ConfigWizardView({
             <h2 className="shell-section-title" id="wizard-commands-title">
               2. Suggested Commands
             </h2>
-            <span className="shell-subtitle" style={{ fontSize: 13 }}>
-              {enabledCommands} enabled
-            </span>
+            <div
+              style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+            >
+              <span className="shell-subtitle" style={{ fontSize: 13 }}>
+                {enabledCommands} enabled
+              </span>
+              <button
+                type="button"
+                className="shell-button"
+                style={{ minHeight: 38, padding: "0 14px" }}
+                onClick={() => {
+                  void onAddCommand();
+                }}
+              >
+                Add Command
+              </button>
+            </div>
           </div>
+
+          {wizardDraft.commands.length === 0 && (
+            <div className="shell-field">
+              No commands yet. Add one manually to continue.
+            </div>
+          )}
 
           {wizardDraft.commands.map((command) => (
             <article
@@ -301,7 +338,7 @@ export function ConfigWizardView({
             <button
               type="button"
               className="shell-button"
-              disabled={enabledCommands === 0 || wizardSavePending}
+              disabled={!canSave}
               onClick={() => {
                 void onSave();
               }}

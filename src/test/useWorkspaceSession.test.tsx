@@ -80,7 +80,7 @@ function createDetectedCommand(
     cmd: "npm run dev",
     enabled: true,
     autostart: true,
-    source: "detected",
+    source: "script_hint",
     ...overrides,
   };
 }
@@ -175,6 +175,11 @@ describe("useWorkspaceSession", () => {
     mockInvoke({
       load_app_state: state,
       inspect_project_folder: inspection,
+      save_app_state: createAppState({
+        last_project_path: inspection.path,
+        recent_projects: [createRecentProject({ name: "no-config", path: inspection.path })],
+      }),
+      generate_config_preview: new Error("Config must include at least one enabled command"),
     });
 
     const { result } = renderHook(() => useWorkspaceSession());
@@ -185,6 +190,12 @@ describe("useWorkspaceSession", () => {
 
     expect(result.current.project).toEqual(inspection);
     expect(result.current.restoreError).toBeNull();
+    expect(result.current.appState).toEqual(
+      createAppState({
+        last_project_path: inspection.path,
+        recent_projects: [createRecentProject({ name: "no-config", path: inspection.path })],
+      })
+    );
   });
 
   it("routes to invalid state when restore fails", async () => {
@@ -357,20 +368,34 @@ describe("useWorkspaceSession", () => {
     mockInvoke({
       load_app_state: state,
       inspect_project_folder: [inspection, savedInspection],
+      generate_config_preview: [
+        "name: alpha\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
+        "name: alpha\nprocesses:\n  - name: web\n    cmd: npm run dev\n    autostart: true\n",
+      ],
       save_config: "/projects/alpha/maki.yaml",
       bind_current_project_window: createCurrentWindow({
         project_path: savedInspection.path,
       }),
-      save_app_state: createAppState({
-        last_project_path: "/projects/alpha",
-        recent_projects: [createRecentProject()],
-      }),
+      save_app_state: [
+        createAppState({
+          last_project_path: "/projects/alpha",
+          recent_projects: [createRecentProject()],
+        }),
+        createAppState({
+          last_project_path: "/projects/alpha",
+          recent_projects: [createRecentProject()],
+        }),
+      ],
     });
 
     const { result } = renderHook(() => useWorkspaceSession());
 
     await waitFor(() => {
       expect(result.current.screen).toBe("wizard");
+    });
+
+    await act(async () => {
+      await result.current.refreshWizardPreview(draft);
     });
 
     await act(async () => {
@@ -418,14 +443,26 @@ describe("useWorkspaceSession", () => {
     mockInvoke({
       load_app_state: state,
       inspect_project_folder: [inspection, savedInspection],
+      generate_config_preview: [
+        "name: alpha\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
+        "name: alpha\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
+      ],
       save_config: "/projects/alpha/maki.yaml",
       bind_current_project_window: new Error("Binding current project window failed"),
+      save_app_state: createAppState({
+        last_project_path: "/projects/alpha",
+        recent_projects: [createRecentProject()],
+      }),
     });
 
     const { result } = renderHook(() => useWorkspaceSession());
 
     await waitFor(() => {
       expect(result.current.screen).toBe("wizard");
+    });
+
+    await act(async () => {
+      await result.current.refreshWizardPreview(draft);
     });
 
     await act(async () => {
@@ -573,8 +610,8 @@ describe("useWorkspaceSession", () => {
         project_path: current.path,
       }),
       save_app_state: createAppState({
-        last_project_path: current.path,
-        recent_projects: [current, other],
+        last_project_path: other.path,
+        recent_projects: [other, current],
       }),
       generate_config_preview:
         "name: beta\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
@@ -595,6 +632,12 @@ describe("useWorkspaceSession", () => {
     });
 
     expect(result.current.project).toEqual(otherInspection);
+    expect(result.current.appState).toEqual(
+      createAppState({
+        last_project_path: other.path,
+        recent_projects: [other, current],
+      })
+    );
     expect(result.current.wizardDraft).toEqual(
       expect.objectContaining({
         project_name: "beta",
@@ -609,6 +652,84 @@ describe("useWorkspaceSession", () => {
     expect(invokeMock).not.toHaveBeenCalledWith("open_project_window", {
       projectPath: other.path,
     });
+    expect(invokeMock).toHaveBeenCalledWith("save_app_state", {
+      state: expect.objectContaining({
+        last_project_path: other.path,
+        recent_projects: [other, current],
+      }),
+    });
+  });
+
+  it("blocks saving the wizard until the preview is current after edits", async () => {
+    const state = createAppState({
+      last_project_path: "/projects/alpha",
+      recent_projects: [createRecentProject()],
+    });
+    const inspection = createInspection({
+      has_config: false,
+      script_hints: ["npm run dev"],
+    });
+
+    mockInvoke({
+      load_app_state: state,
+      inspect_project_folder: inspection,
+      save_app_state: state,
+      generate_config_preview:
+        "name: alpha\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
+    });
+
+    const { result } = renderHook(() => useWorkspaceSession());
+
+    await waitFor(() => {
+      expect(result.current.screen).toBe("wizard");
+    });
+
+    act(() => {
+      result.current.updateWizardCommand("detected-0", { name: "web" });
+    });
+
+    await act(async () => {
+      await result.current.saveWizardConfig();
+    });
+
+    expect(invokeMock).not.toHaveBeenCalledWith("save_config", expect.anything());
+    expect(result.current.restoreError).toBe(
+      "Refresh the YAML preview before saving the config."
+    );
+    expect(result.current.screen).toBe("wizard");
+  });
+
+  it("blocks saving the wizard when preview generation failed", async () => {
+    const state = createAppState({
+      last_project_path: "/projects/alpha",
+      recent_projects: [createRecentProject()],
+    });
+    const inspection = createInspection({
+      has_config: false,
+      script_hints: ["npm run dev"],
+    });
+
+    mockInvoke({
+      load_app_state: state,
+      inspect_project_folder: inspection,
+      save_app_state: state,
+      generate_config_preview: new Error("Config must include at least one enabled command"),
+    });
+
+    const { result } = renderHook(() => useWorkspaceSession());
+
+    await waitFor(() => {
+      expect(result.current.screen).toBe("wizard");
+    });
+
+    await act(async () => {
+      await result.current.saveWizardConfig();
+    });
+
+    expect(invokeMock).not.toHaveBeenCalledWith("save_config", expect.anything());
+    expect(result.current.restoreError).toBe(
+      "Refresh the YAML preview before saving the config."
+    );
   });
 
   it("keeps picker state and app state intact when native routing fails from recents", async () => {

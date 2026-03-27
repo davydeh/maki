@@ -179,9 +179,14 @@ export interface WorkspaceSessionState {
   wizardSavePending: boolean;
   openFolder: () => Promise<void>;
   openRecentProject: (project: RecentProject) => Promise<void>;
+  addWizardCommand: () => void;
   updateWizardCommand: (commandId: string, updates: WizardCommandUpdate) => void;
   refreshWizardPreview: (draft?: WizardDraft) => Promise<void>;
   saveWizardConfig: (draft?: WizardDraft) => Promise<void>;
+}
+
+function getDraftSignature(draft: WizardDraft): string {
+  return JSON.stringify(toConfigDraft(draft));
 }
 
 export function useWorkspaceSession(): WorkspaceSessionState {
@@ -195,10 +200,12 @@ export function useWorkspaceSession(): WorkspaceSessionState {
   const [wizardPreviewPending, setWizardPreviewPending] = useState(false);
   const [wizardPreviewDirty, setWizardPreviewDirty] = useState(false);
   const [wizardSavePending, setWizardSavePending] = useState(false);
+  const [wizardPreviewSignature, setWizardPreviewSignature] = useState<string | null>(null);
   const appStateRef = useRef(DEFAULT_APP_STATE);
   const projectRef = useRef<ProjectInspection | null>(null);
   const wizardDraftRef = useRef<WizardDraft | null>(null);
   const previewRequestIdRef = useRef(0);
+  const nextManualCommandIdRef = useRef(0);
 
   useEffect(() => {
     appStateRef.current = appState;
@@ -245,12 +252,14 @@ export function useWorkspaceSession(): WorkspaceSessionState {
 
   const clearWizardState = useCallback(() => {
     previewRequestIdRef.current += 1;
+    nextManualCommandIdRef.current = 0;
     setWizardDraft(null);
     setWizardPreview(null);
     setWizardPreviewError(null);
     setWizardPreviewPending(false);
     setWizardPreviewDirty(false);
     setWizardSavePending(false);
+    setWizardPreviewSignature(null);
   }, []);
 
   const refreshWizardPreview = useCallback(
@@ -276,6 +285,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
 
         setWizardPreview(preview);
         setWizardPreviewDirty(false);
+        setWizardPreviewSignature(getDraftSignature(draftToPreview));
       } catch (error) {
         if (previewRequestIdRef.current !== requestId) {
           return;
@@ -283,6 +293,8 @@ export function useWorkspaceSession(): WorkspaceSessionState {
 
         setWizardPreview(null);
         setWizardPreviewError(toErrorMessage(error));
+        setWizardPreviewDirty(false);
+        setWizardPreviewSignature(null);
       } finally {
         if (previewRequestIdRef.current === requestId) {
           setWizardPreviewPending(false);
@@ -293,7 +305,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
   );
 
   const enterWizardLocally = useCallback(
-    (inspection: ProjectInspection) => {
+    async (baseState: WorkspaceAppState, inspection: ProjectInspection) => {
       const nextDraft = buildWizardDraft(inspection);
 
       setProject(inspection);
@@ -304,11 +316,19 @@ export function useWorkspaceSession(): WorkspaceSessionState {
       setWizardPreviewPending(false);
       setWizardPreviewDirty(false);
       setWizardSavePending(false);
+      setWizardPreviewSignature(null);
+      nextManualCommandIdRef.current = 0;
       setScreen("wizard");
+
+      try {
+        await persistAppState(baseState, inspection);
+      } catch (error) {
+        setRestoreError(toErrorMessage(error));
+      }
 
       void refreshWizardPreview(nextDraft);
     },
-    [refreshWizardPreview]
+    [persistAppState, refreshWizardPreview]
   );
 
   const enterWorkspaceLocally = useCallback(
@@ -339,7 +359,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         }
 
         if (!inspection.has_config) {
-          enterWizardLocally(inspection);
+          await enterWizardLocally(currentAppState, inspection);
           return;
         }
 
@@ -357,7 +377,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
           return;
         }
 
-        enterWizardLocally(inspection);
+        await enterWizardLocally(currentAppState, inspection);
       } catch (error) {
         setRestoreError(toErrorMessage(error));
       }
@@ -402,10 +422,40 @@ export function useWorkspaceSession(): WorkspaceSessionState {
           ),
         };
       });
+      setWizardPreviewError(null);
       setWizardPreviewDirty(true);
+      setWizardPreviewSignature(null);
     },
     []
   );
+
+  const addWizardCommand = useCallback(() => {
+    const manualId = `manual-${nextManualCommandIdRef.current++}`;
+
+    setWizardDraft((currentDraft) => {
+      if (!currentDraft) {
+        return currentDraft;
+      }
+
+      return {
+        ...currentDraft,
+        commands: [
+          ...currentDraft.commands,
+          {
+            id: manualId,
+            name: "",
+            cmd: "",
+            enabled: true,
+            autostart: true,
+            source: "manual",
+          },
+        ],
+      };
+    });
+    setWizardPreviewError(null);
+    setWizardPreviewDirty(true);
+    setWizardPreviewSignature(null);
+  }, []);
 
   const saveWizardConfig = useCallback(
     async (draftOverride?: WizardDraft) => {
@@ -416,6 +466,17 @@ export function useWorkspaceSession(): WorkspaceSessionState {
 
       const draftToSave = draftOverride ?? wizardDraft;
       if (!draftToSave) {
+        return;
+      }
+
+      if (
+        wizardPreviewPending ||
+        wizardPreviewError ||
+        !wizardPreview ||
+        wizardPreviewSignature !== getDraftSignature(draftToSave)
+      ) {
+        setRestoreError("Refresh the YAML preview before saving the config.");
+        setScreen("wizard");
         return;
       }
 
@@ -444,7 +505,15 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         setWizardSavePending(false);
       }
     },
-    [enterWorkspaceLocally, inspectProject, wizardDraft]
+    [
+      enterWorkspaceLocally,
+      inspectProject,
+      wizardDraft,
+      wizardPreview,
+      wizardPreviewError,
+      wizardPreviewPending,
+      wizardPreviewSignature,
+    ]
   );
 
   useEffect(() => {
@@ -480,7 +549,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         }
 
         if (!inspection.has_config) {
-          enterWizardLocally(inspection);
+          await enterWizardLocally(loadedState, inspection);
           return;
         }
 
@@ -539,6 +608,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
     wizardSavePending,
     openFolder,
     openRecentProject,
+    addWizardCommand,
     updateWizardCommand,
     refreshWizardPreview,
     saveWizardConfig,

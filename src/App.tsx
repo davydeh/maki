@@ -294,6 +294,7 @@ export default function App() {
             wizardPreviewPending={session.wizardPreviewPending}
             wizardPreviewDirty={session.wizardPreviewDirty}
             wizardSavePending={session.wizardSavePending}
+            onAddCommand={session.addWizardCommand}
             onUpdateCommand={session.updateWizardCommand}
             onRefreshPreview={session.refreshWizardPreview}
             onSave={session.saveWizardConfig}
