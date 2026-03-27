@@ -221,6 +221,8 @@ export default function App() {
               status: "running" as const,
               sessionId: undefined,
               autostart: t.autostart,
+              // Mark one-off commands as transient so they show in the bar
+              transient: !t.autostart,
             }
             : t
         );
@@ -281,6 +283,19 @@ export default function App() {
           : tab
       )
     );
+
+    // Auto-remove transient (one-off) commands 10s after they exit
+    setTimeout(() => {
+      setTabs((prev) => {
+        const tab = prev.find((t) => t.id === tabId);
+        if (tab?.transient && tab.status !== "running") {
+          return prev.map((t) =>
+            t.id === tabId ? { ...t, transient: false } : t
+          );
+        }
+        return prev;
+      });
+    }, 10_000);
   }, []);
 
   useEffect(() => {
@@ -306,7 +321,7 @@ export default function App() {
         handleOpenFolder();
       }
 
-      if (event.metaKey && (event.key === "/" || event.key.toLowerCase() === "k")) {
+      if (event.metaKey && event.key.toLowerCase() === "p") {
         event.preventDefault();
         setCommandLauncherOpen(true);
       }
@@ -493,7 +508,7 @@ export default function App() {
       </div>
 
       <CommandBar
-        commands={tabs.filter((tab) => tab.type === "process" && tab.autostart)}
+        commands={tabs.filter((tab) => tab.type === "process" && (tab.autostart || tab.transient))}
         hasOneOffCommands={tabs.some((tab) => tab.type === "process" && !tab.autostart)}
         activeTabId={activeTabId}
         theme={theme}

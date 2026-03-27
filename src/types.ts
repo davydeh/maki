@@ -118,6 +118,7 @@ export interface Tab {
   status: TabStatus;
   exitCode?: number;
   autostart: boolean;
+  transient?: boolean;
   sessionId?: number;
   workspacePath?: string;
   cwd?: string;

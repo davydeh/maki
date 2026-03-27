@@ -125,11 +125,9 @@ export function CommandBar({
 
   return (
     <div className="command-bar">
-      <div className="command-bar__meta">Auto-run</div>
-
       <div className="command-bar__group">
         {commands.length === 0 && (
-          <span className="command-bar__empty">No auto-run commands configured</span>
+          <span className="command-bar__empty">No auto-run commands</span>
         )}
 
         {commands.map((tab) => (
@@ -148,7 +146,7 @@ export function CommandBar({
         <button className="command-launcher-trigger" onClick={onOpenLauncher}>
           <Search size={12} />
           <span>Run command</span>
-          <span className="command-launcher-trigger__hint">Cmd+K</span>
+          <span className="command-launcher-trigger__hint">Cmd+P</span>
         </button>
       )}
     </div>
