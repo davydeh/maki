@@ -1038,8 +1038,8 @@ describe("App workspace integration", () => {
 
     rerender(<App />);
 
+    // "web" process appears in command bar, project name in shell tabs
     expect(await screen.findByText("web")).toBeInTheDocument();
-    expect(screen.getByText("shell")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(invokeMock).toHaveBeenCalledWith("get_config", {

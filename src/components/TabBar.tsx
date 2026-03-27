@@ -1,5 +1,5 @@
-import { useState, Fragment } from "react";
-import { Plus } from "lucide-react";
+import { useState, useRef, useEffect, Fragment } from "react";
+import { Plus, FolderOpen } from "lucide-react";
 import type { Tab } from "../types";
 import type { Theme } from "../themes";
 
@@ -7,9 +7,9 @@ interface TabBarProps {
   tabs: Tab[];
   activeTabId: string;
   theme: Theme;
+  projectName: string;
   onTabClick: (id: string) => void;
   onTabClose: (id: string) => void;
-  onToggleProcess: (id: string) => void;
   onOpenFolder: () => void;
   onNewTab: () => void;
 }
@@ -18,147 +18,250 @@ export function TabBar({
   tabs,
   activeTabId,
   theme,
+  projectName,
   onTabClick,
   onTabClose,
-  onToggleProcess,
   onOpenFolder,
   onNewTab,
 }: TabBarProps) {
   const shells = tabs.filter((t) => t.type === "shell");
-  const commands = tabs.filter((t) => t.type === "process");
 
   return (
-    <div className="tab-bar" style={{ userSelect: "none" }}>
-      {/* Row 1: Shell tabs */}
-      <div
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        height: "38px",
+        padding: "0 8px",
+        gap: "4px",
+        background: theme.activeTabBg,
+        userSelect: "none",
+      }}
+      data-tauri-drag-region
+    >
+      {shells.map((tab) => (
+        <ShellTab
+          key={tab.id}
+          tab={tab}
+          defaultName={projectName}
+          isActive={tab.id === activeTabId}
+          theme={theme}
+          onTabClick={onTabClick}
+          onTabClose={onTabClose}
+        />
+      ))}
+
+      <button
+        onClick={onNewTab}
         style={{
           display: "flex",
-          alignItems: "flex-end",
-          padding: "8px 10px 0",
-          gap: "0",
-          background: theme.tabBarBg,
+          alignItems: "center",
+          justifyContent: "center",
+          width: "28px",
+          height: "28px",
+          background: "none",
+          border: "none",
+          color: theme.tabFg,
+          cursor: "pointer",
+          borderRadius: "6px",
+          opacity: 0.4,
+          flexShrink: 0,
         }}
-        data-tauri-drag-region
+        title="New shell (Cmd+T)"
       >
-        {shells.map((tab) => {
-          const isActive = tab.id === activeTabId;
-          return (
-            <div
-              key={tab.id}
-              className={`shell-tab ${isActive ? "shell-tab--active" : ""}`}
-              onClick={() => onTabClick(tab.id)}
-            >
-              <span
-                style={{
-                  fontSize: "12px",
-                  opacity: isActive ? 0.6 : 0.35,
-                  flexShrink: 0,
-                  fontFamily: '"SF Mono", Menlo, monospace',
-                }}
-              >
-                &gt;_
-              </span>
-              <span
-                style={{
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  flex: 1,
-                }}
-              >
-                {tab.name}
-              </span>
-              {isActive && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onTabClose(tab.id);
-                  }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: theme.stopped,
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    padding: "0",
-                    lineHeight: 1,
-                    flexShrink: 0,
-                    opacity: 0.6,
-                  }}
-                  title="Close (Cmd+W)"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          );
-        })}
+        <Plus size={14} />
+      </button>
 
-        <button
-          onClick={onNewTab}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "32px",
-            height: "32px",
-            marginBottom: "2px",
-            background: "none",
-            border: "none",
-            color: theme.tabFg,
-            cursor: "pointer",
-            borderRadius: "6px",
-            opacity: 0.35,
+      <div style={{ flex: 1 }} data-tauri-drag-region />
+
+      <button
+        onClick={onOpenFolder}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "4px",
+          background: "none",
+          border: "none",
+          color: theme.tabFg,
+          cursor: "pointer",
+          fontSize: "11px",
+          padding: "4px 8px",
+          lineHeight: 1,
+          opacity: 0.4,
+          flexShrink: 0,
+        }}
+        title="Open Folder... (Cmd+O)"
+      >
+        <FolderOpen size={12} />
+      </button>
+    </div>
+  );
+}
+
+/* ── Command bar (sits at the bottom, above status bar) ── */
+
+interface CommandBarProps {
+  tabs: Tab[];
+  activeTabId: string;
+  theme: Theme;
+  onTabClick: (id: string) => void;
+  onToggleProcess: (id: string) => void;
+}
+
+export function CommandBar({
+  tabs,
+  activeTabId,
+  theme,
+  onTabClick,
+  onToggleProcess,
+}: CommandBarProps) {
+  const commands = tabs.filter((t) => t.type === "process");
+  if (commands.length === 0) return null;
+
+  return (
+    <div className="command-bar">
+      {commands.map((tab, i) => (
+        <Fragment key={tab.id}>
+          {i > 0 && <span className="command-bar__divider" />}
+          <CommandItem
+            tab={tab}
+            isActive={tab.id === activeTabId}
+            theme={theme}
+            onTabClick={onTabClick}
+            onToggleProcess={onToggleProcess}
+          />
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
+/* ── Shell tab with inline rename ── */
+
+function ShellTab({
+  tab,
+  defaultName,
+  isActive,
+  theme,
+  onTabClick,
+  onTabClose,
+}: {
+  tab: Tab;
+  defaultName: string;
+  isActive: boolean;
+  theme: Theme;
+  onTabClick: (id: string) => void;
+  onTabClose: (id: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const [customName, setCustomName] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const displayName = customName || defaultName;
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const commitRename = () => {
+    const trimmed = editValue.trim();
+    setCustomName(trimmed || null);
+    setEditing(false);
+  };
+
+  return (
+    <div
+      onClick={() => onTabClick(tab.id)}
+      onDoubleClick={() => {
+        setEditValue(displayName);
+        setEditing(true);
+      }}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "6px",
+        flex: 1,
+        minWidth: 0,
+        padding: "5px 12px",
+        borderRadius: "8px",
+        backgroundColor: isActive ? theme.tabBarBg : "transparent",
+        color: isActive ? theme.activeTabFg : theme.tabFg,
+        cursor: "pointer",
+        fontSize: "12px",
+        fontWeight: isActive ? 600 : 400,
+        transition: "background-color 100ms ease",
+      }}
+    >
+      {editing ? (
+        <input
+          ref={inputRef}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitRename();
+            if (e.key === "Escape") setEditing(false);
           }}
-          title="New shell (Cmd+T)"
-        >
-          <Plus size={15} />
-        </button>
-
-        <div style={{ flex: 1 }} data-tauri-drag-region />
-
-        <button
-          onClick={onOpenFolder}
+          onClick={(e) => e.stopPropagation()}
           style={{
             background: "none",
             border: "none",
-            color: theme.tabFg,
+            color: "inherit",
+            fontSize: "inherit",
+            fontWeight: "inherit",
+            textAlign: "center",
+            width: "100%",
+            outline: "none",
+            padding: 0,
+          }}
+        />
+      ) : (
+        <span
+          style={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            textAlign: "center",
+          }}
+        >
+          {displayName}
+        </span>
+      )}
+
+      {isActive && !editing && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onTabClose(tab.id);
+          }}
+          style={{
+            background: "none",
+            border: "none",
+            color: theme.stopped,
             cursor: "pointer",
-            fontSize: "11px",
-            padding: "4px 8px",
-            marginBottom: "4px",
+            fontSize: "13px",
+            padding: 0,
             lineHeight: 1,
-            opacity: 0.35,
+            flexShrink: 0,
+            opacity: 0.6,
           }}
-          title="Open Folder... (Cmd+O)"
+          title="Close (Cmd+W)"
         >
-          Open Folder...
+          ×
         </button>
-      </div>
-
-      {/* Row 2: Command bookmarks bar */}
-      {commands.length > 0 && (
-        <div className="command-bar">
-          {commands.map((tab, i) => (
-            <Fragment key={tab.id}>
-              {i > 0 && <span className="command-bar__divider" />}
-              <CommandBookmark
-                tab={tab}
-                isActive={tab.id === activeTabId}
-                theme={theme}
-                onTabClick={onTabClick}
-                onToggleProcess={onToggleProcess}
-              />
-            </Fragment>
-          ))}
-        </div>
       )}
     </div>
   );
 }
 
-/* Command bookmark — compact with pipe separators */
-function CommandBookmark({
+/* ── Command item (flex-distributed) ── */
+
+function CommandItem({
   tab,
   isActive,
   theme,
@@ -231,7 +334,15 @@ function CommandBookmark({
           }}
         />
       )}
-      <span>{tab.name}</span>
+      <span
+        style={{
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {tab.name}
+      </span>
     </div>
   );
 }

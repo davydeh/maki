@@ -10,7 +10,7 @@ import { listen } from "@tauri-apps/api/event";
 import { ConfigWizardView } from "./components/ConfigWizardView";
 import { ProjectPickerView } from "./components/ProjectPickerView";
 import { StatusBar } from "./components/StatusBar";
-import { TabBar } from "./components/TabBar";
+import { TabBar, CommandBar } from "./components/TabBar";
 import { TerminalView } from "./components/TerminalView";
 import { useWorkspaceSession } from "./hooks/useWorkspaceSession";
 import { getTheme, type Theme } from "./themes";
@@ -442,9 +442,9 @@ export default function App() {
         tabs={tabs}
         activeTabId={activeTabId}
         theme={theme}
+        projectName={workspaceConfig.config.name || projectRoot.split("/").pop() || "shell"}
         onTabClick={handleTabClick}
         onTabClose={handleTabClose}
-        onToggleProcess={handleToggleProcess}
         onOpenFolder={handleOpenFolder}
         onNewTab={handleNewTab}
       />
@@ -467,6 +467,14 @@ export default function App() {
           />
         ))}
       </div>
+
+      <CommandBar
+        tabs={tabs}
+        activeTabId={activeTabId}
+        theme={theme}
+        onTabClick={handleTabClick}
+        onToggleProcess={handleToggleProcess}
+      />
 
       <StatusBar
         tabs={tabs}

@@ -31,67 +31,17 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* --- Tab bar chrome --- */
-
-.tab-bar {
-  --tab-bg: var(--shell-surface);
-  --tab-active: var(--shell-surface-strong);
-}
-
-.shell-tab {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px 7px 14px;
-  min-width: 180px;
-  max-width: 260px;
-  border-radius: 6px 6px 0 0;
-  background: transparent;
-  color: var(--shell-muted);
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 400;
-  transition: background-color 100ms ease;
-}
-
-.shell-tab--active {
-  background: var(--tab-active);
-  color: var(--shell-fg);
-  font-weight: 700;
-}
-
-/* Inverted rounded corners at bottom of active tab (Chrome-style) */
-.shell-tab--active::before,
-.shell-tab--active::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  width: 6px;
-  height: 6px;
-  background: transparent;
-}
-
-.shell-tab--active::before {
-  left: -6px;
-  border-bottom-right-radius: 6px;
-  box-shadow: 3px 0 0 0 var(--tab-active);
-}
-
-.shell-tab--active::after {
-  right: -6px;
-  border-bottom-left-radius: 6px;
-  box-shadow: -3px 0 0 0 var(--tab-active);
-}
+/* --- Command bar (bottom, above status bar) --- */
 
 .command-bar {
   display: flex;
   align-items: center;
-  min-height: 32px;
-  padding: 0 12px;
+  height: 30px;
+  padding: 0 4px;
   gap: 0;
-  background: var(--shell-surface-strong);
-  font-size: 13px;
+  background: var(--shell-surface);
+  font-size: 12px;
+  border-top: 1px solid var(--shell-border);
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -104,23 +54,24 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 12px;
-  border-radius: 4px;
+  padding: 4px 10px;
+  flex: 1;
+  min-width: 0;
   cursor: pointer;
   transition: background-color 100ms ease;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 
 .command-bar__item:hover {
-  background: rgba(205, 214, 244, 0.06);
+  background: rgba(205, 214, 244, 0.05);
 }
 
 .command-bar__divider {
   width: 1px;
-  height: 14px;
-  background: rgba(205, 214, 244, 0.08);
+  height: 60%;
+  background: rgba(205, 214, 244, 0.1);
   flex-shrink: 0;
+  align-self: center;
 }
 
 button,

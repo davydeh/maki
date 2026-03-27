@@ -8,10 +8,16 @@ interface StatusBarProps {
   theme: Theme;
 }
 
+function shortenHome(path: string): string {
+  const home = `/Users/${path.split("/")[2] || ""}`;
+  return path.startsWith(home) ? "~" + path.slice(home.length) : path;
+}
+
 export function StatusBar({ tabs, gitStatus, projectPath, theme }: StatusBarProps) {
   const running = tabs.filter((t) => t.status === "running").length;
   const errored = tabs.filter((t) => t.status === "errored").length;
   const stopped = tabs.filter((t) => t.status === "stopped").length;
+  const displayPath = shortenHome(projectPath);
 
   return (
     <div
@@ -38,7 +44,7 @@ export function StatusBar({ tabs, gitStatus, projectPath, theme }: StatusBarProp
             }}
             title={projectPath}
           >
-            {projectPath}
+            {displayPath}
           </span>
         )}
         {gitStatus?.is_repo && (
