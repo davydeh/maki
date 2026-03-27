@@ -276,6 +276,11 @@ export function useWorkspaceSession(): WorkspaceSessionState {
           return;
         }
 
+        if (currentWindow && currentWindow.project_path !== inspection.path) {
+          await routeToProjectWindow(inspection.path);
+          return;
+        }
+
         if (!currentWindow) {
           const windowResult = await routeToProjectWindow(inspection.path);
 

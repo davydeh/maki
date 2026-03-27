@@ -229,6 +229,43 @@ describe("useWorkspaceSession", () => {
     expect(result.current.project).toBeNull();
   });
 
+  it("routes restored boot state through native window routing when another window already hosts the project", async () => {
+    const state = createAppState({
+      last_project_path: "/projects/alpha",
+      recent_projects: [createRecentProject()],
+    });
+    const inspection = createInspection();
+
+    mockInvoke({
+      load_app_state: state,
+      inspect_project_folder: inspection,
+      get_current_project_window: createCurrentWindow({
+        project_path: "/projects/beta",
+        window_label: "project-9",
+      }),
+      open_project_window: createOpenResult({
+        project_path: inspection.path,
+        created: false,
+        window_label: "project-1",
+      }),
+    });
+
+    const { result } = renderHook(() => useWorkspaceSession());
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("open_project_window", {
+        projectPath: inspection.path,
+      });
+    });
+
+    expect(invokeMock).not.toHaveBeenCalledWith(
+      "save_app_state",
+      expect.anything()
+    );
+    expect(result.current.screen).toBe("booting");
+    expect(result.current.project).toBeNull();
+  });
+
   it("opens a new project window when selecting a different recent project", async () => {
     const recentA = createRecentProject();
     const recentB = createRecentProject({
