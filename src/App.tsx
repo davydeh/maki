@@ -41,10 +41,31 @@ function createShellVars(theme: Theme): CSSProperties {
 
 function createTabsFromConfig(config: MakiConfig, projectRoot: string): Tab[] {
   const shell = "/bin/zsh";
-  const nextTabs: Tab[] = [];
+  const shellTabs: Tab[] = [];
+  const processTabs: Tab[] = [];
+
+  // Always start with 2 default shell tabs
+  const configuredShells = config.shells ?? [];
+  const defaultShellCount = Math.max(2, configuredShells.length);
+
+  for (let i = 0; i < defaultShellCount; i++) {
+    const sh = configuredShells[i];
+    const shellCommand = sh?.cmd || shell;
+    shellTabs.push({
+      id: genId(),
+      name: sh?.name || `shell${i > 0 ? ` ${i + 1}` : ""}`,
+      type: "shell",
+      cmd: shellCommand,
+      args: [],
+      status: "running",
+      autostart: true,
+      workspacePath: projectRoot,
+      cwd: projectRoot,
+    });
+  }
 
   for (const proc of config.processes) {
-    nextTabs.push({
+    processTabs.push({
       id: genId(),
       name: proc.name,
       type: "process",
@@ -58,22 +79,8 @@ function createTabsFromConfig(config: MakiConfig, projectRoot: string): Tab[] {
     });
   }
 
-  for (const sh of config.shells ?? []) {
-    const shellCommand = sh.cmd || shell;
-    nextTabs.push({
-      id: genId(),
-      name: sh.name,
-      type: "shell",
-      cmd: shellCommand,
-      args: [],
-      status: "running",
-      autostart: true,
-      workspacePath: projectRoot,
-      cwd: projectRoot,
-    });
-  }
-
-  return nextTabs;
+  // Shells first, then processes
+  return [...shellTabs, ...processTabs];
 }
 
 interface ShellViewProps {
@@ -194,20 +201,30 @@ export default function App() {
   );
 
   const handleToggleProcess = useCallback((id: string) => {
-    setTabs((prev) =>
-      prev.map((tab) => {
-        if (tab.id !== id) {
-          return tab;
-        }
+    setTabs((prev) => {
+      const tab = prev.find((t) => t.id === id);
+      if (!tab) return prev;
 
-        if (tab.status === "running" && tab.sessionId !== undefined) {
-          void invoke("kill_pty", { sessionId: tab.sessionId });
-          return { ...tab, status: "stopped" as const };
-        }
+      if (tab.status === "running" && tab.sessionId !== undefined) {
+        void invoke("kill_pty", { sessionId: tab.sessionId });
+        return prev.map((t) =>
+          t.id === id ? { ...t, status: "stopped" as const } : t
+        );
+      }
 
-        return tab;
-      })
-    );
+      if (tab.status === "stopped" || tab.status === "errored") {
+        // Re-spawn: give a new ID so React remounts TerminalView with a fresh PTY
+        const newId = genId();
+        setActiveTabId((current) => (current === id ? newId : current));
+        return prev.map((t) =>
+          t.id === id
+            ? { ...t, id: newId, status: "running" as const, sessionId: undefined, autostart: true }
+            : t
+        );
+      }
+
+      return prev;
+    });
   }, []);
 
   const handleNewTab = useCallback(() => {

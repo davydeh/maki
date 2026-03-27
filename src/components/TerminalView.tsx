@@ -256,12 +256,14 @@ export function TerminalView({
     })();
   }, [workspaceActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Resize on active/window change
+  // Focus and resize when tab becomes active
   useEffect(() => {
-    if (active && fitRef.current) {
-      // Small delay to let the DOM settle
+    if (active) {
       requestAnimationFrame(() => {
         fitRef.current?.fit();
+        if (typeof termRef.current?.focus === "function") {
+          termRef.current.focus();
+        }
       });
     }
   }, [active]);

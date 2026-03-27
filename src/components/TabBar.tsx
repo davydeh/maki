@@ -108,6 +108,7 @@ function TabItem({
   const isShell = tab.type === "shell";
   const isRunning = tab.status === "running";
   const isErrored = tab.status === "errored";
+  const isStopped = tab.status === "stopped";
 
   // Status dot color
   const dotColor = isRunning
@@ -137,7 +138,7 @@ function TabItem({
       }}
     >
       {/* Status indicator: dot normally, action icon on hover for processes */}
-      {!isShell && hovered && (isRunning || isErrored) ? (
+      {!isShell && hovered && (isRunning || isErrored || isStopped) ? (
         <button
           onClick={(e) => {
             e.stopPropagation();
