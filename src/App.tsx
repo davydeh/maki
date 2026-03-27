@@ -57,7 +57,7 @@ function createTabsFromConfig(config: MakiConfig, projectRoot: string): Tab[] {
     });
   }
 
-  for (const sh of config.shells) {
+  for (const sh of config.shells ?? []) {
     const shellCommand = sh.cmd || shell;
     nextTabs.push({
       id: genId(),

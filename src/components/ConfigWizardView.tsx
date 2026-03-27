@@ -1,5 +1,5 @@
-import type { CSSProperties } from "react";
-import type { DetectionSignal, ProjectInspection, WizardDraft, WizardCommandUpdate } from "../types";
+import { Plus, FolderOpen } from "lucide-react";
+import type { ProjectInspection, WizardDraft, WizardCommandUpdate } from "../types";
 
 interface ConfigWizardViewProps {
   project: ProjectInspection;
@@ -15,95 +15,6 @@ interface ConfigWizardViewProps {
   onRefreshPreview: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
   onOpenFolder: () => void | Promise<void>;
-}
-
-const chipStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "10px 12px",
-  border: "1px solid rgba(137, 180, 250, 0.22)",
-  borderRadius: 999,
-  background: "rgba(137, 180, 250, 0.08)",
-  color: "var(--shell-fg)",
-  fontSize: 13,
-  fontWeight: 600,
-};
-
-const sourceBadgeStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  padding: "4px 8px",
-  borderRadius: 999,
-  background: "rgba(108, 112, 134, 0.18)",
-  color: "var(--shell-muted)",
-  fontSize: 11,
-  fontWeight: 700,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-};
-
-const commandCardStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 16,
-  padding: 18,
-  border: "1px solid var(--shell-border)",
-  borderRadius: 18,
-  background:
-    "linear-gradient(180deg, rgba(137, 180, 250, 0.04), rgba(137, 180, 250, 0)), rgba(49, 50, 68, 0.44)",
-};
-
-const toggleLabelStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 10,
-  fontSize: 14,
-  color: "var(--shell-fg)",
-};
-
-const inputLabelStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-  fontSize: 13,
-  color: "var(--shell-muted)",
-};
-
-const previewPanelStyle: CSSProperties = {
-  minHeight: 220,
-  padding: 18,
-  border: "1px solid var(--shell-border)",
-  borderRadius: 18,
-  background: "rgba(24, 24, 37, 0.88)",
-  overflow: "auto",
-  fontFamily: "SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-  fontSize: 13,
-  lineHeight: 1.6,
-  whiteSpace: "pre-wrap",
-};
-
-function formatStackLabel(stack: DetectionSignal["stack"]): string {
-  switch (stack) {
-    case "node":
-      return "Node.js";
-    case "laravel":
-      return "Laravel";
-    case "python":
-      return "Python";
-  }
-}
-
-function formatSourceLabel(source: string): string {
-  if (source === "script_hint") {
-    return "Script Hint";
-  }
-
-  if (source === "entrypoint_hint") {
-    return "Entrypoint Hint";
-  }
-
-  return "Manual";
 }
 
 function hasInvalidEnabledCommands(draft: WizardDraft): boolean {
@@ -129,7 +40,7 @@ export function ConfigWizardView({
   onSave,
   onOpenFolder,
 }: ConfigWizardViewProps) {
-  const enabledCommands = wizardDraft.commands.filter((command) => command.enabled).length;
+  const enabledCommands = wizardDraft.commands.filter((c) => c.enabled).length;
   const hasInvalidCommands = hasInvalidEnabledCommands(wizardDraft);
   const canSave =
     enabledCommands > 0 &&
@@ -145,17 +56,19 @@ export function ConfigWizardView({
       <div
         className="shell-panel"
         style={{
-          width: "min(980px, 100%)",
-          maxHeight: "min(860px, calc(100vh - 64px))",
+          width: "min(620px, 100%)",
+          maxHeight: "min(700px, calc(100vh - 64px))",
           overflow: "auto",
+          gap: "16px",
+          padding: "24px",
         }}
       >
-        <div className="shell-copy">
-          <span className="shell-kicker">maki</span>
-          <h1 className="shell-title">Set Up {project.name}</h1>
-          <p className="shell-subtitle">
-            Review the detected stack, tune the suggested processes, confirm the YAML,
-            then save `maki.yaml` and launch the workspace.
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          <h1 style={{ fontSize: "18px", fontWeight: 700 }}>
+            Set up {project.name}
+          </h1>
+          <p style={{ fontSize: "13px", color: "var(--shell-muted)" }}>
+            Configure the commands to run when opening this project.
           </p>
         </div>
 
@@ -165,220 +78,320 @@ export function ConfigWizardView({
           </div>
         )}
 
-        <section className="shell-section" aria-labelledby="wizard-detection-title">
-          <div className="shell-section-header">
-            <h2 className="shell-section-title" id="wizard-detection-title">
-              1. Detection Summary
-            </h2>
-          </div>
-          <div className="shell-field">{project.path}</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {project.detected_stacks.length === 0 ? (
-              <div className="shell-field">No framework signals detected. Add the commands you need.</div>
-            ) : (
-              project.detected_stacks.map((signal) => (
-                <div key={signal.stack} style={chipStyle}>
-                  <span>{formatStackLabel(signal.stack)}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section className="shell-section" aria-labelledby="wizard-commands-title">
-          <div className="shell-section-header">
-            <h2 className="shell-section-title" id="wizard-commands-title">
-              2. Suggested Commands
-            </h2>
-            <div
-              style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+        {/* Commands section */}
+        <section style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "var(--shell-muted)",
+                letterSpacing: "0.04em",
+              }}
             >
-              <span className="shell-subtitle" style={{ fontSize: 13 }}>
-                {enabledCommands} enabled
-              </span>
-              <button
-                type="button"
-                className="shell-button"
-                style={{ minHeight: 38, padding: "0 14px" }}
-                onClick={() => {
-                  void onAddCommand();
-                }}
-              >
-                Add Command
-              </button>
-            </div>
+              Commands
+              {enabledCommands > 0 && (
+                <span style={{ fontWeight: 400, marginLeft: "8px" }}>
+                  {enabledCommands} enabled
+                </span>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={() => { void onAddCommand(); }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                padding: "4px 10px",
+                border: "1px solid var(--shell-border)",
+                borderRadius: "6px",
+                background: "var(--shell-surface-strong)",
+                color: "var(--shell-fg)",
+                fontSize: "12px",
+                cursor: "pointer",
+              }}
+            >
+              <Plus size={13} />
+              Add command
+            </button>
           </div>
 
           {wizardDraft.commands.length === 0 && (
-            <div className="shell-field">
-              No commands yet. Add one manually to continue.
+            <div
+              style={{
+                padding: "12px",
+                fontSize: "13px",
+                color: "var(--shell-muted)",
+                border: "1px solid var(--shell-border)",
+                borderRadius: "8px",
+                background: "var(--shell-surface-strong)",
+              }}
+            >
+              No commands yet. Add one to continue.
             </div>
           )}
 
           {hasInvalidCommands && (
-            <div className="shell-field">
-              Complete every enabled command before previewing or saving.
+            <div
+              style={{
+                padding: "8px 12px",
+                fontSize: "12px",
+                color: "var(--shell-danger)",
+              }}
+            >
+              Fill in name and command for all enabled entries.
             </div>
           )}
 
           {wizardDraft.commands.map((command) => (
-            <article
+            <div
               key={command.id}
               data-testid={`wizard-command-${command.id}`}
-              style={commandCardStyle}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                padding: "8px 10px",
+                border: "1px solid var(--shell-border)",
+                borderRadius: "8px",
+                background: "var(--shell-surface-strong)",
+                opacity: command.enabled ? 1 : 0.5,
+              }}
             >
-              <div
+              {/* Rounded checkbox */}
+              <label
                 style={{
                   display: "flex",
-                  flexWrap: "wrap",
                   alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
+                  cursor: "pointer",
+                  flexShrink: 0,
                 }}
               >
-                <label style={toggleLabelStyle}>
-                  <input
-                    aria-label="Enable"
-                    type="checkbox"
-                    checked={command.enabled}
-                    onChange={(event) => {
-                      onUpdateCommand(command.id, { enabled: event.target.checked });
-                    }}
-                  />
-                  <span>Enable</span>
-                </label>
-                <span style={sourceBadgeStyle}>{formatSourceLabel(command.source)}</span>
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-                  gap: 14,
-                }}
-              >
-                <label style={inputLabelStyle}>
-                  <span>Name</span>
-                  <input
-                    aria-label="Name"
-                    className="shell-field"
-                    value={command.name}
-                    onChange={(event) => {
-                      onUpdateCommand(command.id, { name: event.target.value });
-                    }}
-                  />
-                </label>
-
-                <label style={{ ...inputLabelStyle, gridColumn: "1 / -1" }}>
-                  <span>Command</span>
-                  <input
-                    aria-label="Command"
-                    className="shell-field"
-                    value={command.cmd}
-                    onChange={(event) => {
-                      onUpdateCommand(command.id, { cmd: event.target.value });
-                    }}
-                  />
-                </label>
-              </div>
-
-              <label style={toggleLabelStyle}>
                 <input
-                  aria-label="Autostart"
                   type="checkbox"
-                  checked={command.autostart}
-                  onChange={(event) => {
-                    onUpdateCommand(command.id, { autostart: event.target.checked });
+                  aria-label="Enable"
+                  checked={command.enabled}
+                  onChange={(e) => {
+                    onUpdateCommand(command.id, { enabled: e.target.checked });
                   }}
+                  style={{ display: "none" }}
                 />
-                <span>Autostart</span>
+                <span
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "18px",
+                    height: "18px",
+                    borderRadius: "50%",
+                    border: command.enabled
+                      ? "none"
+                      : "2px solid var(--shell-muted)",
+                    background: command.enabled
+                      ? "var(--shell-accent)"
+                      : "transparent",
+                    transition: "all 100ms ease",
+                    flexShrink: 0,
+                  }}
+                >
+                  {command.enabled && (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <path
+                        d="M2 5L4.5 7.5L8 3"
+                        stroke="white"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </span>
               </label>
-            </article>
+
+              {/* Name input */}
+              <input
+                aria-label="Name"
+                value={command.name}
+                onChange={(e) => {
+                  onUpdateCommand(command.id, { name: e.target.value });
+                }}
+                placeholder="name"
+                style={{
+                  width: "100px",
+                  padding: "4px 8px",
+                  border: "1px solid var(--shell-border)",
+                  borderRadius: "4px",
+                  background: "var(--shell-surface)",
+                  color: "var(--shell-fg)",
+                  fontSize: "12px",
+                  flexShrink: 0,
+                }}
+              />
+
+              {/* Command input */}
+              <input
+                aria-label="Command"
+                value={command.cmd}
+                onChange={(e) => {
+                  onUpdateCommand(command.id, { cmd: e.target.value });
+                }}
+                placeholder="command"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  padding: "4px 8px",
+                  border: "1px solid var(--shell-border)",
+                  borderRadius: "4px",
+                  background: "var(--shell-surface)",
+                  color: "var(--shell-fg)",
+                  fontSize: "12px",
+                }}
+              />
+
+              {/* Autostart toggle */}
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  fontSize: "11px",
+                  color: "var(--shell-muted)",
+                }}
+                title="Autostart this command on project open"
+              >
+                <input
+                  type="checkbox"
+                  aria-label="Autostart"
+                  checked={command.autostart}
+                  onChange={(e) => {
+                    onUpdateCommand(command.id, { autostart: e.target.checked });
+                  }}
+                  style={{ display: "none" }}
+                />
+                <span
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "14px",
+                    height: "14px",
+                    borderRadius: "50%",
+                    border: command.autostart
+                      ? "none"
+                      : "1.5px solid var(--shell-muted)",
+                    background: command.autostart
+                      ? "#a6e3a1"
+                      : "transparent",
+                    transition: "all 100ms ease",
+                  }}
+                >
+                  {command.autostart && (
+                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                      <path
+                        d="M2 5L4.5 7.5L8 3"
+                        stroke="#11111b"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </span>
+                <span>auto</span>
+              </label>
+            </div>
           ))}
         </section>
 
-        <section className="shell-section" aria-labelledby="wizard-autostart-title">
-          <div className="shell-section-header">
-            <h2 className="shell-section-title" id="wizard-autostart-title">
-              3. Autostart Plan
-            </h2>
+        {/* Preview error */}
+        {wizardPreviewError && (
+          <div className="shell-error-banner" role="alert">
+            {wizardPreviewError}
           </div>
-          <div className="shell-field">
-            {enabledCommands === 0
-              ? "Enable at least one command before saving the config."
-              : `${wizardDraft.commands.filter((command) => command.enabled && command.autostart).length} of ${enabledCommands} enabled commands will launch automatically.`}
-          </div>
-        </section>
+        )}
 
-        <section className="shell-section" aria-labelledby="wizard-preview-title">
-          <div className="shell-section-header">
-            <h2 className="shell-section-title" id="wizard-preview-title">
-              4. YAML Preview
-            </h2>
+        {wizardPreviewDirty && !wizardPreviewPending && (
+          <div style={{ fontSize: "12px", color: "var(--shell-muted)", padding: "0 2px" }}>
+            Config changed.{" "}
             <button
               type="button"
-              className="shell-button"
-              style={{ minHeight: 38, padding: "0 14px" }}
-              disabled={hasInvalidCommands || wizardPreviewPending}
-              onClick={() => {
-                void onRefreshPreview();
-              }}
-            >
-              Refresh Preview
-            </button>
-          </div>
-
-          {wizardPreviewError && (
-            <div className="shell-error-banner" role="alert">
-              {wizardPreviewError}
-            </div>
-          )}
-
-          {wizardPreviewDirty && !wizardPreviewPending && (
-            <div className="shell-field">Preview is out of date. Refresh it before saving.</div>
-          )}
-
-          <pre data-testid="config-preview" style={previewPanelStyle}>
-            {wizardPreviewPending
-              ? "Generating preview..."
-              : wizardPreview || "# Preview will appear here once maki can generate it."}
-          </pre>
-        </section>
-
-        <section className="shell-section" aria-labelledby="wizard-save-title">
-          <div className="shell-section-header">
-            <h2 className="shell-section-title" id="wizard-save-title">
-              5. Save And Launch
-            </h2>
-          </div>
-          <div className="shell-actions">
-            <button
-              type="button"
-              className="shell-button"
-              disabled={!canSave}
-              onClick={() => {
-                void onSave();
-              }}
-            >
-              {wizardSavePending ? "Saving..." : "Save Config"}
-            </button>
-            <button
-              type="button"
-              className="shell-button"
+              onClick={() => { void onRefreshPreview(); }}
               style={{
-                background: "rgba(49, 50, 68, 0.7)",
-                color: "var(--shell-fg)",
-                borderColor: "var(--shell-border)",
-                boxShadow: "none",
-              }}
-              onClick={() => {
-                void onOpenFolder();
+                background: "none",
+                border: "none",
+                color: "var(--shell-accent)",
+                cursor: "pointer",
+                fontSize: "12px",
+                textDecoration: "underline",
+                padding: 0,
               }}
             >
-              Choose Another Folder
-            </button>
+              Refresh preview
+            </button>{" "}
+            before saving.
           </div>
-        </section>
+        )}
+
+        {/* Actions */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            paddingTop: "4px",
+            borderTop: "1px solid var(--shell-border)",
+          }}
+        >
+          <button
+            type="button"
+            disabled={!canSave}
+            onClick={() => { void onSave(); }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "6px 14px",
+              border: "1px solid transparent",
+              borderRadius: "6px",
+              background: canSave ? "var(--shell-accent)" : "var(--shell-surface-strong)",
+              color: canSave ? "#11111b" : "var(--shell-muted)",
+              fontSize: "13px",
+              fontWeight: 600,
+              cursor: canSave ? "pointer" : "default",
+              opacity: canSave ? 1 : 0.6,
+            }}
+          >
+            {wizardSavePending ? "Saving..." : "Save and launch"}
+          </button>
+          <button
+            type="button"
+            onClick={() => { void onOpenFolder(); }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "6px 14px",
+              border: "1px solid var(--shell-border)",
+              borderRadius: "6px",
+              background: "var(--shell-surface-strong)",
+              color: "var(--shell-fg)",
+              fontSize: "13px",
+              cursor: "pointer",
+            }}
+          >
+            <FolderOpen size={13} />
+            Choose another folder
+          </button>
+        </div>
       </div>
     </div>
   );
