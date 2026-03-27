@@ -38,12 +38,10 @@ export function TerminalView({
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<number | null>(null);
-  const initializedRef = useRef(false);
 
   // Initialize terminal and PTY
   useEffect(() => {
-    if (!containerRef.current || initializedRef.current) return;
-    initializedRef.current = true;
+    if (!containerRef.current) return;
 
     const term = new Terminal({
       theme: theme.terminal,
@@ -99,6 +97,26 @@ export function TerminalView({
       );
       unlisteners.push(unlisten2);
 
+      // Listeners are ready — spawn PTY now if workspace is already active at
+      // mount time (the common v0.2 path where TerminalView only renders in the
+      // workspace branch of App.tsx).
+      if (autostart && workspaceActive && sessionIdRef.current === null) {
+        try {
+          const sessionId = await invoke<number>("spawn_pty", {
+            cmd,
+            args,
+            cols: term.cols,
+            rows: term.rows,
+            cwd: cwd || null,
+            env: env || null,
+          });
+          sessionIdRef.current = sessionId;
+          onSessionCreated(tabId, sessionId);
+        } catch (e) {
+          term.write(`\x1b[31mError spawning process: ${e}\x1b[0m\r\n`);
+          onExit(tabId, -1);
+        }
+      }
     })();
 
     // Forward keyboard input to PTY
@@ -126,7 +144,10 @@ export function TerminalView({
       unlisteners.forEach((fn) => fn());
       if (sessionIdRef.current !== null) {
         invoke("kill_pty", { sessionId: sessionIdRef.current });
+        sessionIdRef.current = null;
       }
+      termRef.current = null;
+      fitRef.current = null;
       term.dispose();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
