@@ -59,6 +59,8 @@ pub fn spawn_pty(
     }
     cmd_builder.env("TERM", "xterm-256color");
     cmd_builder.env("COLORTERM", "truecolor");
+    cmd_builder.env("LANG", "en_US.UTF-8");
+    cmd_builder.env("LC_ALL", "en_US.UTF-8");
     cmd_builder.env("MAKI", "1");
 
     if let Some(extra_env) = env {

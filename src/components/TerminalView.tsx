@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import "@xterm/xterm/css/xterm.css";
@@ -56,6 +57,15 @@ export function TerminalView({
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(containerRef.current);
+
+    // Unicode 11 width tables — fixes box-drawing and emoji alignment
+    try {
+      const unicodeAddon = new Unicode11Addon();
+      term.loadAddon(unicodeAddon);
+      term.unicode.activeVersion = "11";
+    } catch {
+      // Test environment — unicode addon not available
+    }
 
     try {
       const webglAddon = new WebglAddon();
