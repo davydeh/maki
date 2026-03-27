@@ -133,7 +133,12 @@ fn normalize_recent_projects(
     let mut seen_paths = HashSet::new();
 
     for project in recent_projects {
-        let canonical_path = canonicalize_project_path(Path::new(&project.path))?;
+        let path = Path::new(&project.path);
+        if !path.exists() {
+            continue;
+        }
+
+        let canonical_path = canonicalize_project_path(path)?;
         let canonical_path_string = canonical_path.to_string_lossy().into_owned();
 
         if seen_paths.insert(canonical_path_string.clone()) {
@@ -308,5 +313,50 @@ mod tests {
                 path: canonical_path,
             }]
         );
+    }
+
+    #[test]
+    fn save_skips_stale_recent_projects_without_failing() {
+        let temp_dir = unique_temp_dir("state-stale");
+        fs::create_dir_all(&temp_dir).unwrap();
+        let state_path = temp_dir.join("workspace_state.json");
+
+        let active_project = temp_dir.join("active-project");
+        fs::create_dir_all(&active_project).unwrap();
+        let stale_project = temp_dir.join("missing-project");
+
+        let mut state = WorkspaceAppState::default();
+        state.last_project_path = Some(active_project.to_string_lossy().into_owned());
+        state.recent_projects = vec![
+            RecentProject {
+                name: "Stale".to_string(),
+                path: stale_project.to_string_lossy().into_owned(),
+            },
+            RecentProject {
+                name: "Active".to_string(),
+                path: active_project.to_string_lossy().into_owned(),
+            },
+        ];
+
+        let normalized = save_app_state_to_file(&state_path, &state).unwrap();
+
+        assert_eq!(
+            normalized.last_project_path,
+            Some(active_project.to_string_lossy().into_owned())
+        );
+        assert_eq!(
+            normalized.recent_projects,
+            vec![RecentProject {
+                name: "Active".to_string(),
+                path: active_project
+                    .canonicalize()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned(),
+            }]
+        );
+
+        let reloaded = load_app_state_from_file(&state_path).unwrap();
+        assert_eq!(reloaded, normalized);
     }
 }
