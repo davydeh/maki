@@ -34,8 +34,7 @@ export function TabBar({
         style={{
           display: "flex",
           alignItems: "flex-end",
-          height: "42px",
-          padding: "0 10px",
+          padding: "8px 10px 0",
           gap: "0",
           background: theme.tabBarBg,
         }}

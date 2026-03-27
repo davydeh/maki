@@ -43,10 +43,10 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px 6px 14px;
+  padding: 7px 10px 7px 14px;
   min-width: 180px;
   max-width: 260px;
-  border-radius: 10px 10px 0 0;
+  border-radius: 6px 6px 0 0;
   background: transparent;
   color: var(--shell-muted);
   cursor: pointer;
@@ -67,21 +67,21 @@ body {
   content: "";
   position: absolute;
   bottom: 0;
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 6px;
   background: transparent;
 }
 
 .shell-tab--active::before {
-  left: -10px;
-  border-bottom-right-radius: 10px;
-  box-shadow: 5px 0 0 0 var(--tab-active);
+  left: -6px;
+  border-bottom-right-radius: 6px;
+  box-shadow: 3px 0 0 0 var(--tab-active);
 }
 
 .shell-tab--active::after {
-  right: -10px;
-  border-bottom-left-radius: 10px;
-  box-shadow: -5px 0 0 0 var(--tab-active);
+  right: -6px;
+  border-bottom-left-radius: 6px;
+  box-shadow: -3px 0 0 0 var(--tab-active);
 }
 
 .command-bar {
@@ -92,6 +92,12 @@ body {
   gap: 0;
   background: var(--shell-surface-strong);
   font-size: 13px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.command-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .command-bar__item {
@@ -99,11 +105,11 @@ body {
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  min-width: 80px;
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 100ms ease;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .command-bar__item:hover {
