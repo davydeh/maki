@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Plus, FolderOpen, Play, Square, Search } from "lucide-react";
+import { Plus, FolderOpen, Search } from "lucide-react";
 import type { Tab } from "../types";
 import type { Theme } from "../themes";
 
@@ -319,43 +319,57 @@ function CommandPill({
   onRunCommand: (id: string) => void;
   onStopCommand: (id: string) => void;
 }) {
+  const [hovered, setHovered] = useState(false);
   const isRunning = tab.status === "running";
   const isErrored = tab.status === "errored";
 
-  const stateColor = isRunning
+  const dotColor = isRunning
     ? theme.running
     : isErrored
       ? theme.errored
       : theme.stopped;
 
   return (
-    <div
-      className={`command-pill ${isActive ? "command-pill--active" : ""}`}
+    <button
+      className="command-pill"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={(e) => {
+        e.stopPropagation();
+        // Just focus, don't restart running commands
+        if (isRunning) {
+          onRunCommand(tab.id); // this just focuses via setActiveTabId
+        }
+      }}
       style={{
-        borderColor: isActive ? theme.accent : theme.border,
         color: isActive ? theme.fg : theme.tabFg,
+        fontWeight: isActive ? 600 : 400,
       }}
     >
-      <button
-        className="command-pill__run"
-        onClick={() => onRunCommand(tab.id)}
-        title={isRunning ? "Open running command" : "Run command"}
-      >
-        <span className="command-pill__state" style={{ backgroundColor: stateColor }} />
-        {isRunning ? <Square size={10} strokeWidth={2.5} /> : <Play size={10} strokeWidth={2.5} />}
-        <span className="command-pill__name">{tab.name}</span>
-      </button>
-
-      {isRunning && (
-        <button
-          className="command-pill__stop"
-          onClick={() => onStopCommand(tab.id)}
-          title="Stop command"
+      <span
+        style={{
+          width: "6px",
+          height: "6px",
+          borderRadius: "50%",
+          backgroundColor: dotColor,
+          flexShrink: 0,
+        }}
+      />
+      <span className="command-pill__name">{tab.name}</span>
+      {hovered && isRunning && (
+        <span
+          className="command-pill__action"
+          onClick={(e) => {
+            e.stopPropagation();
+            onStopCommand(tab.id);
+          }}
+          title="Stop"
+          style={{ color: theme.errored }}
         >
-          <Square size={10} strokeWidth={2.5} />
-        </button>
+          ■
+        </span>
       )}
-    </div>
+    </button>
   );
 }
 

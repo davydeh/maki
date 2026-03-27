@@ -205,30 +205,29 @@ export default function App() {
       const tab = prev.find((t) => t.id === id);
       if (!tab) return prev;
 
+      // Already running — just focus it
       if (tab.status === "running") {
         setActiveTabId(tab.id);
         return prev;
       }
 
-      if (tab.status === "stopped" || tab.status === "errored") {
-        const newId = genId();
-        setActiveTabId(newId);
-        return prev.map((t) =>
-          t.id === id
-            ? {
-              ...t,
-              id: newId,
-              status: "running" as const,
-              sessionId: undefined,
-              autostart: t.autostart,
-              // Mark one-off commands as transient so they show in the bar
-              transient: !t.autostart,
-            }
-            : t
-        );
-      }
+      // Restart: new ID forces TerminalView remount with fresh PTY
+      const newId = genId();
+      const isTransient = !tab.autostart;
+      const updated = {
+        ...tab,
+        id: newId,
+        status: "running" as const,
+        sessionId: undefined,
+        autostart: true, // must be true so PTY spawns on mount
+        transient: isTransient,
+      };
 
-      return prev;
+      setActiveTabId(newId);
+
+      // Remove old entry, append updated at end of process tabs
+      const without = prev.filter((t) => t.id !== id);
+      return [...without, updated];
     });
   }, []);
 

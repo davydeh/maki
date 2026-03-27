@@ -39,9 +39,9 @@ body {
 .command-bar {
   display: flex;
   align-items: center;
-  min-height: 42px;
-  padding: 6px 10px;
-  gap: 10px;
+  height: 28px;
+  padding: 2px 4px;
+  gap: 2px;
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--shell-surface) 85%, black 15%),
@@ -52,19 +52,10 @@ body {
   overflow: hidden;
 }
 
-.command-bar__meta {
-  flex: 0 0 auto;
-  font-size: 10px;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: var(--shell-muted);
-  font-weight: 700;
-}
-
 .command-bar__group {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   flex: 1;
   min-width: 0;
   overflow-x: auto;
@@ -83,46 +74,19 @@ body {
 
 .command-pill {
   display: inline-flex;
-  align-items: stretch;
-  min-width: 150px;
-  max-width: 280px;
-  border: 1px solid;
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--shell-surface-strong) 70%, transparent);
-  transition:
-    border-color 120ms ease,
-    background-color 120ms ease,
-    transform 120ms ease;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 2px;
+  background: rgba(205, 214, 244, 0.06);
   white-space: nowrap;
+  cursor: pointer;
+  font-size: 12px;
 }
 
 .command-pill:hover {
-  transform: translateY(-1px);
-  background: color-mix(in srgb, var(--shell-surface-strong) 80%, transparent);
-}
-
-.command-pill--active {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--shell-accent) 25%, transparent);
-}
-
-.command-pill__run {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-  padding: 6px 10px;
-  border: none;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.command-pill__state {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  flex-shrink: 0;
+  background: rgba(205, 214, 244, 0.1);
 }
 
 .command-pill__name {
@@ -131,30 +95,24 @@ body {
   text-overflow: ellipsis;
 }
 
-.command-pill__stop {
-  border: none;
-  border-left: 1px solid
-    color-mix(in srgb, var(--shell-border) 70%, transparent);
-  width: 28px;
-  background: transparent;
-  color: var(--shell-muted);
+.command-pill__action {
+  font-size: 8px;
   cursor: pointer;
-}
-
-.command-pill__stop:hover {
-  color: var(--shell-danger);
+  margin-left: 2px;
 }
 
 .command-launcher-trigger {
   display: inline-flex;
+  min-height: 20px;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex: 0 0 auto;
-  padding: 6px 10px;
+  padding: 2px 7px;
   border: 1px solid var(--shell-border);
-  border-radius: 9px;
+  border-radius: 6px;
   background: color-mix(in srgb, var(--shell-surface-strong) 55%, transparent);
   color: var(--shell-fg);
+  font-size: 11px;
   cursor: pointer;
 }
 
@@ -168,7 +126,7 @@ body {
 
 .command-launcher-trigger__hint {
   color: var(--shell-muted);
-  margin-left: 2px;
+  margin-left: 12px;
 }
 
 .command-launcher {
@@ -187,8 +145,8 @@ body {
   width: min(700px, 100%);
   max-height: min(72vh, 640px);
   border: 1px solid;
-  border-radius: 14px;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  border-radius: 12px;
+
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -221,7 +179,7 @@ body {
   padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .command-launcher__item {
