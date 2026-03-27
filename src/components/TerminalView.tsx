@@ -119,6 +119,76 @@ export function TerminalView({
       }
     })();
 
+    // Shell keybindings (Ghostty/iTerm2-like)
+    if (typeof term.attachCustomKeyEventHandler !== "function") {
+      // Test environment — skip keybinding setup
+    } else term.attachCustomKeyEventHandler((event) => {
+      if (event.type !== "keydown") return true;
+
+      // Cmd+K — clear terminal
+      if (event.metaKey && event.key === "k") {
+        event.preventDefault();
+        term.clear();
+        return false;
+      }
+
+      // Cmd+Left — move to line start (send Home / Ctrl+A)
+      if (event.metaKey && event.key === "ArrowLeft") {
+        event.preventDefault();
+        if (sessionIdRef.current !== null) {
+          void invoke("write_pty", { sessionId: sessionIdRef.current, data: "\x01" });
+        }
+        return false;
+      }
+
+      // Cmd+Right — move to line end (send End / Ctrl+E)
+      if (event.metaKey && event.key === "ArrowRight") {
+        event.preventDefault();
+        if (sessionIdRef.current !== null) {
+          void invoke("write_pty", { sessionId: sessionIdRef.current, data: "\x05" });
+        }
+        return false;
+      }
+
+      // Option+Left — word back (send ESC b)
+      if (event.altKey && event.key === "ArrowLeft") {
+        event.preventDefault();
+        if (sessionIdRef.current !== null) {
+          void invoke("write_pty", { sessionId: sessionIdRef.current, data: "\x1bb" });
+        }
+        return false;
+      }
+
+      // Option+Right — word forward (send ESC f)
+      if (event.altKey && event.key === "ArrowRight") {
+        event.preventDefault();
+        if (sessionIdRef.current !== null) {
+          void invoke("write_pty", { sessionId: sessionIdRef.current, data: "\x1bf" });
+        }
+        return false;
+      }
+
+      // Option+Backspace — delete word back (send ESC DEL)
+      if (event.altKey && event.key === "Backspace") {
+        event.preventDefault();
+        if (sessionIdRef.current !== null) {
+          void invoke("write_pty", { sessionId: sessionIdRef.current, data: "\x1b\x7f" });
+        }
+        return false;
+      }
+
+      // Cmd+Backspace — delete to line start (send Ctrl+U)
+      if (event.metaKey && event.key === "Backspace") {
+        event.preventDefault();
+        if (sessionIdRef.current !== null) {
+          void invoke("write_pty", { sessionId: sessionIdRef.current, data: "\x15" });
+        }
+        return false;
+      }
+
+      return true;
+    });
+
     // Forward keyboard input to PTY
     term.onData(async (data) => {
       if (sessionIdRef.current !== null) {

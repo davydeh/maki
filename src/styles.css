@@ -43,10 +43,7 @@ select {
   align-items: center;
   justify-content: center;
   padding: 32px;
-  background:
-    radial-gradient(circle at top left, rgba(137, 180, 250, 0.18), transparent 32%),
-    radial-gradient(circle at bottom right, rgba(49, 50, 68, 0.85), transparent 38%),
-    linear-gradient(180deg, rgba(24, 24, 37, 0.96), rgba(30, 30, 46, 1));
+  background: var(--shell-bg);
   color: var(--shell-fg);
 }
 
@@ -57,13 +54,8 @@ select {
   gap: 20px;
   padding: 32px;
   border: 1px solid var(--shell-border);
-  border-radius: 20px;
-  background:
-    linear-gradient(180deg, rgba(49, 50, 68, 0.28), rgba(24, 24, 37, 0)),
-    var(--shell-surface);
-  box-shadow:
-    0 22px 48px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(205, 214, 244, 0.03);
+  border-radius: 12px;
+  background: var(--shell-surface);
 }
 
 .shell-copy {
@@ -81,14 +73,15 @@ select {
 }
 
 .shell-title {
-  font-size: clamp(28px, 4vw, 36px);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
+  font-size: clamp(24px, 4vw, 30px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .shell-subtitle {
   max-width: 56ch;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--shell-muted);
 }
@@ -107,7 +100,7 @@ select {
 }
 
 .shell-section-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -116,10 +109,10 @@ select {
 
 .shell-field {
   width: 100%;
-  padding: 13px 15px;
+  padding: 10px 14px;
   border: 1px solid var(--shell-border);
-  border-radius: 14px;
-  background: rgba(49, 50, 68, 0.54);
+  border-radius: 8px;
+  background: var(--shell-surface-strong);
   color: var(--shell-fg);
   line-height: 1.5;
 }
@@ -128,26 +121,20 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 0 18px;
+  min-height: 36px;
+  padding: 0 16px;
   border: 1px solid transparent;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(137, 180, 250, 1), rgba(116, 159, 232, 1));
+  border-radius: 8px;
+  background: var(--shell-accent);
   color: #11111b;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition:
-    transform 120ms ease,
-    box-shadow 120ms ease,
-    filter 120ms ease;
-  box-shadow: 0 10px 24px rgba(137, 180, 250, 0.28);
+  transition: filter 100ms ease;
 }
 
 .shell-button:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.02);
+  filter: brightness(1.1);
 }
 
 .shell-button:focus-visible,
@@ -157,24 +144,19 @@ select {
   outline-offset: 2px;
 }
 
-.shell-button:active,
-.project-picker__card:active,
-.project-picker__row:active {
-  transform: translateY(0);
-}
-
 .shell-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .shell-error-banner {
-  padding: 12px 14px;
-  border: 1px solid rgba(243, 139, 168, 0.36);
-  border-radius: 14px;
-  background: rgba(243, 139, 168, 0.12);
+  padding: 10px 14px;
+  border: 1px solid rgba(243, 139, 168, 0.3);
+  border-radius: 8px;
+  background: rgba(243, 139, 168, 0.1);
   color: #f5c2e7;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -225,29 +207,22 @@ select {
   justify-content: center;
   gap: 10px;
   min-width: 140px;
-  padding: 22px 20px;
+  padding: 20px;
   border: 1px solid var(--shell-border);
-  border-radius: 12px;
-  background: rgba(49, 50, 68, 0.36);
+  border-radius: 8px;
+  background: var(--shell-surface-strong);
   color: var(--shell-fg);
   cursor: pointer;
-  transition:
-    border-color 120ms ease,
-    background-color 120ms ease,
-    transform 120ms ease,
-    box-shadow 120ms ease;
+  transition: border-color 100ms ease, background-color 100ms ease;
 }
 
 .project-picker__card:hover {
-  border-color: rgba(137, 180, 250, 0.5);
-  background: rgba(49, 50, 68, 0.6);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border-color: var(--shell-accent);
+  background: rgba(49, 50, 68, 0.8);
 }
 
 .project-picker__card-icon {
-  color: var(--shell-accent);
-  opacity: 0.7;
+  color: var(--shell-muted);
 }
 
 .project-picker__card-label {
@@ -263,7 +238,7 @@ select {
   flex-direction: column;
   gap: 2px;
   padding-top: 4px;
-  border-top: 1px solid rgba(205, 214, 244, 0.06);
+  border-top: 1px solid var(--shell-border);
 }
 
 .project-picker__recents-header {
@@ -301,7 +276,7 @@ select {
   gap: 16px;
   padding: 9px 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   text-align: left;
@@ -310,7 +285,7 @@ select {
 }
 
 .project-picker__row:hover {
-  background: rgba(49, 50, 68, 0.55);
+  background: var(--shell-surface-strong);
 }
 
 .project-picker__name {
@@ -346,7 +321,6 @@ select {
 
   .shell-panel {
     padding: 24px;
-    border-radius: 18px;
   }
 
   .project-picker {
