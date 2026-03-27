@@ -26,6 +26,95 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   background: var(--shell-bg);
   color: var(--shell-fg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* --- Tab bar chrome --- */
+
+.tab-bar {
+  --tab-bg: var(--shell-surface);
+  --tab-active: var(--shell-surface-strong);
+}
+
+.shell-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 14px;
+  min-width: 180px;
+  max-width: 260px;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  color: var(--shell-muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 400;
+  transition: background-color 100ms ease;
+}
+
+.shell-tab--active {
+  background: var(--tab-active);
+  color: var(--shell-fg);
+  font-weight: 700;
+}
+
+/* Inverted rounded corners at bottom of active tab (Chrome-style) */
+.shell-tab--active::before,
+.shell-tab--active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+
+.shell-tab--active::before {
+  left: -10px;
+  border-bottom-right-radius: 10px;
+  box-shadow: 5px 0 0 0 var(--tab-active);
+}
+
+.shell-tab--active::after {
+  right: -10px;
+  border-bottom-left-radius: 10px;
+  box-shadow: -5px 0 0 0 var(--tab-active);
+}
+
+.command-bar {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  gap: 0;
+  background: var(--shell-surface-strong);
+  font-size: 13px;
+}
+
+.command-bar__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  min-width: 80px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 100ms ease;
+  white-space: nowrap;
+}
+
+.command-bar__item:hover {
+  background: rgba(205, 214, 244, 0.06);
+}
+
+.command-bar__divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(205, 214, 244, 0.08);
+  flex-shrink: 0;
 }
 
 button,
