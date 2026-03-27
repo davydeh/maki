@@ -73,14 +73,11 @@ export function TerminalView({
     const unlisteners: Array<() => void> = [];
 
     (async () => {
-      const unlisten1 = await listen<{ session_id: number; data: number[] }>(
+      const unlisten1 = await listen<{ session_id: number; data: string }>(
         "pty-output",
         (event) => {
           if (event.payload.session_id === sessionIdRef.current) {
-            const text = new TextDecoder().decode(
-              new Uint8Array(event.payload.data)
-            );
-            term.write(text);
+            term.write(event.payload.data);
           }
         }
       );

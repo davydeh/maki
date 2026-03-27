@@ -23,7 +23,7 @@ pub struct PtyState {
 #[derive(Serialize, Clone)]
 pub struct PtyOutput {
     pub session_id: u32,
-    pub data: Vec<u8>,
+    pub data: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -58,6 +58,7 @@ pub fn spawn_pty(
         cmd_builder.arg(arg);
     }
     cmd_builder.env("TERM", "xterm-256color");
+    cmd_builder.env("COLORTERM", "truecolor");
     cmd_builder.env("MAKI", "1");
 
     if let Some(extra_env) = env {
@@ -69,7 +70,10 @@ pub fn spawn_pty(
         cmd_builder.cwd(dir);
     }
 
-    let child = pair.slave.spawn_command(cmd_builder).map_err(|e| e.to_string())?;
+    let child = pair
+        .slave
+        .spawn_command(cmd_builder)
+        .map_err(|e| e.to_string())?;
     drop(pair.slave);
 
     let reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
@@ -96,22 +100,38 @@ pub fn spawn_pty(
 }
 
 fn read_pty_output(mut reader: Box<dyn Read + Send>, session_id: u32, app: AppHandle) {
-    let mut buf = [0u8; 4096];
+    // 64KB buffer: large enough to capture a full TUI screen redraw in one read
+    let mut buf = [0u8; 65536];
     loop {
         match reader.read(&mut buf) {
             Ok(0) => {
-                let _ = app.emit("pty-exit", PtyExit { session_id, exit_code: 0 });
+                let _ = app.emit(
+                    "pty-exit",
+                    PtyExit {
+                        session_id,
+                        exit_code: 0,
+                    },
+                );
                 break;
             }
             Ok(n) => {
+                // Send as UTF-8 string directly -- avoids JSON number-array overhead
+                // (lossy conversion handles rare non-UTF-8 bytes gracefully)
+                let text = String::from_utf8_lossy(&buf[..n]).into_owned();
                 let output = PtyOutput {
                     session_id,
-                    data: buf[..n].to_vec(),
+                    data: text,
                 };
                 let _ = app.emit("pty-output", &output);
             }
             Err(_) => {
-                let _ = app.emit("pty-exit", PtyExit { session_id, exit_code: -1 });
+                let _ = app.emit(
+                    "pty-exit",
+                    PtyExit {
+                        session_id,
+                        exit_code: -1,
+                    },
+                );
                 break;
             }
         }
@@ -127,7 +147,9 @@ pub fn write_pty(
     let sessions = state.sessions.lock().unwrap();
     let session = sessions.get(&session_id).ok_or("Session not found")?;
     let mut writer = session.writer.lock().unwrap();
-    writer.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
+    writer
+        .write_all(data.as_bytes())
+        .map_err(|e| e.to_string())?;
     writer.flush().map_err(|e| e.to_string())?;
     Ok(())
 }
