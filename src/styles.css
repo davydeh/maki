@@ -64,6 +64,11 @@ select {
     inset 0 1px 0 rgba(205, 214, 244, 0.03);
 }
 
+.project-picker {
+  max-height: min(760px, calc(100vh - 64px));
+  gap: 0;
+}
+
 .shell-copy {
   display: flex;
   flex-direction: column;
@@ -180,6 +185,17 @@ select {
   gap: 10px;
 }
 
+.project-picker__body {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  padding-right: 6px;
+  margin-right: -6px;
+}
+
 .project-picker__item {
   width: 100%;
   display: flex;
@@ -225,6 +241,13 @@ select {
   word-break: break-all;
 }
 
+.project-picker__footer {
+  flex-shrink: 0;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(205, 214, 244, 0.08);
+}
+
 @media (max-width: 640px) {
   .shell-screen {
     padding: 20px;
@@ -233,5 +256,9 @@ select {
   .shell-panel {
     padding: 22px;
     border-radius: 18px;
+  }
+
+  .project-picker {
+    max-height: calc(100vh - 40px);
   }
 }

@@ -104,6 +104,28 @@ describe("ProjectPickerView", () => {
     expect(screen.getByText("/projects/beta")).toBeInTheDocument();
   });
 
+  it("keeps the visible project path in the accessible name for duplicate folder names", () => {
+    const alphaA = createRecentProject();
+    const alphaB = createRecentProject({
+      path: "/archive/alpha",
+    });
+
+    render(
+      <ProjectPickerView
+        recentProjects={[alphaA, alphaB]}
+        restoreError={null}
+        onOpenFolder={vi.fn()}
+        onSelectRecentProject={vi.fn()}
+      />
+    );
+
+    const buttons = screen.getAllByRole("button", { name: /^alpha/i });
+
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]).toHaveAccessibleName("alpha/projects/alpha");
+    expect(buttons[1]).toHaveAccessibleName("alpha/archive/alpha");
+  });
+
   it("shows restore error banner when provided", () => {
     render(
       <ProjectPickerView
@@ -152,6 +174,31 @@ describe("ProjectPickerView", () => {
     fireEvent.click(screen.getByRole("button", { name: /alpha/i }));
 
     expect(onSelectRecentProject).toHaveBeenCalledWith(alpha);
+  });
+
+  it("keeps the open-folder action outside the scrollable picker body", () => {
+    const { container } = render(
+      <ProjectPickerView
+        recentProjects={Array.from({ length: 20 }, (_, index) =>
+          createRecentProject({
+            name: `project-${index}`,
+            path: `/projects/project-${index}`,
+          })
+        )}
+        restoreError={null}
+        onOpenFolder={vi.fn()}
+        onSelectRecentProject={vi.fn()}
+      />
+    );
+
+    const pickerBody = container.querySelector(".project-picker__body");
+    const pickerFooter = container.querySelector(".project-picker__footer");
+    const openFolderButton = screen.getByRole("button", { name: /open folder/i });
+
+    expect(pickerBody).not.toBeNull();
+    expect(pickerFooter).not.toBeNull();
+    expect(pickerBody).not.toContainElement(openFolderButton);
+    expect(pickerFooter).toContainElement(openFolderButton);
   });
 
   it("reaches the native open folder command instead of only mutating local state", async () => {
