@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AppScreen,
@@ -7,6 +7,7 @@ import type {
   ProjectWindowContext,
   ProjectWindowOpenResult,
   RecentProject,
+  WizardCommandUpdate,
   WizardDraft,
   WorkspaceAppState,
 } from "../types";
@@ -59,17 +60,83 @@ function createAppStateUpdate(
   };
 }
 
-function buildWizardDraft(inspection: ProjectInspection): WizardDraft {
-  const commands = [...inspection.script_hints, ...inspection.entrypoint_hints].map(
-    (command, index): DetectedCommand => ({
-      id: `detected-${index}`,
-      name: command,
-      cmd: command,
-      enabled: true,
-      autostart: true,
-      source: "detected",
-    })
+function normalizeCommandName(command: string): string {
+  const trimmed = command.trim();
+
+  if (!trimmed) {
+    return "process";
+  }
+
+  const npmRunMatch = trimmed.match(/^npm run ([^\s]+)$/);
+  if (npmRunMatch) {
+    return npmRunMatch[1];
+  }
+
+  const npmMatch = trimmed.match(/^npm ([^\s]+)$/);
+  if (npmMatch) {
+    return npmMatch[1];
+  }
+
+  const artisanMatch = trimmed.match(/^php artisan ([^\s]+)$/);
+  if (artisanMatch) {
+    return artisanMatch[1];
+  }
+
+  const pythonModuleMatch = trimmed.match(/^python -m ([^\s]+)$/);
+  if (pythonModuleMatch) {
+    return pythonModuleMatch[1].split(".").at(-1) ?? pythonModuleMatch[1];
+  }
+
+  const pythonFileMatch = trimmed.match(/^python ([^\s]+)$/);
+  if (pythonFileMatch) {
+    const fileName = pythonFileMatch[1].split("/").at(-1) ?? pythonFileMatch[1];
+    return fileName.replace(/\.[^.]+$/, "");
+  }
+
+  return (
+    trimmed
+      .split(/\s+/)
+      .at(-1)
+      ?.replace(/[^a-zA-Z0-9:_-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "process"
   );
+}
+
+function buildWizardDraft(inspection: ProjectInspection): WizardDraft {
+  const usedCommands = new Set<string>();
+  const nameUsage = new Map<string, number>();
+  const detectedCommands = [
+    ...inspection.script_hints.map((command) => ({
+      command,
+      source: "script_hint" as const,
+    })),
+    ...inspection.entrypoint_hints.map((command) => ({
+      command,
+      source: "entrypoint_hint" as const,
+    })),
+  ];
+  const commands = detectedCommands.flatMap(({ command, source }, index): DetectedCommand[] => {
+    if (usedCommands.has(command)) {
+      return [];
+    }
+
+    usedCommands.add(command);
+    const baseName = normalizeCommandName(command);
+    const count = nameUsage.get(baseName) ?? 0;
+    const name = count === 0 ? baseName : `${baseName}-${count + 1}`;
+    nameUsage.set(baseName, count + 1);
+
+    return [
+      {
+        id: `detected-${index}`,
+        name,
+        cmd: command,
+        enabled: true,
+        autostart: true,
+        source,
+      },
+    ];
+  });
 
   return {
     project_name: inspection.name,
@@ -77,20 +144,24 @@ function buildWizardDraft(inspection: ProjectInspection): WizardDraft {
   };
 }
 
+function toConfigDraft(draft: WizardDraft) {
+  return {
+    project_name: draft.project_name,
+    theme: draft.theme,
+    commands: draft.commands.map((command) => ({
+      name: command.name,
+      cmd: command.cmd,
+      enabled: command.enabled,
+      autostart: command.autostart,
+    })),
+  };
+}
+
 function toSaveConfigRequest(projectPath: string, draft: WizardDraft) {
   return {
     request: {
       project_path: projectPath,
-      draft: {
-        project_name: draft.project_name,
-        theme: draft.theme,
-        commands: draft.commands.map((command) => ({
-          name: command.name,
-          cmd: command.cmd,
-          enabled: command.enabled,
-          autostart: command.autostart,
-        })),
-      },
+      draft: toConfigDraft(draft),
     },
   };
 }
@@ -101,8 +172,15 @@ export interface WorkspaceSessionState {
   project: ProjectInspection | null;
   restoreError: string | null;
   wizardDraft: WizardDraft | null;
+  wizardPreview: string | null;
+  wizardPreviewError: string | null;
+  wizardPreviewPending: boolean;
+  wizardPreviewDirty: boolean;
+  wizardSavePending: boolean;
   openFolder: () => Promise<void>;
   openRecentProject: (project: RecentProject) => Promise<void>;
+  updateWizardCommand: (commandId: string, updates: WizardCommandUpdate) => void;
+  refreshWizardPreview: (draft?: WizardDraft) => Promise<void>;
   saveWizardConfig: (draft?: WizardDraft) => Promise<void>;
 }
 
@@ -112,6 +190,27 @@ export function useWorkspaceSession(): WorkspaceSessionState {
   const [project, setProject] = useState<ProjectInspection | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [wizardDraft, setWizardDraft] = useState<WizardDraft | null>(null);
+  const [wizardPreview, setWizardPreview] = useState<string | null>(null);
+  const [wizardPreviewError, setWizardPreviewError] = useState<string | null>(null);
+  const [wizardPreviewPending, setWizardPreviewPending] = useState(false);
+  const [wizardPreviewDirty, setWizardPreviewDirty] = useState(false);
+  const [wizardSavePending, setWizardSavePending] = useState(false);
+  const appStateRef = useRef(DEFAULT_APP_STATE);
+  const projectRef = useRef<ProjectInspection | null>(null);
+  const wizardDraftRef = useRef<WizardDraft | null>(null);
+  const previewRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    appStateRef.current = appState;
+  }, [appState]);
+
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
+
+  useEffect(() => {
+    wizardDraftRef.current = wizardDraft;
+  }, [wizardDraft]);
 
   const persistAppState = useCallback(
     async (baseState: WorkspaceAppState, inspection: ProjectInspection) => {
@@ -144,34 +243,109 @@ export function useWorkspaceSession(): WorkspaceSessionState {
     return invoke<ProjectInspection>("inspect_project_folder", { path });
   }, []);
 
+  const clearWizardState = useCallback(() => {
+    previewRequestIdRef.current += 1;
+    setWizardDraft(null);
+    setWizardPreview(null);
+    setWizardPreviewError(null);
+    setWizardPreviewPending(false);
+    setWizardPreviewDirty(false);
+    setWizardSavePending(false);
+  }, []);
+
+  const refreshWizardPreview = useCallback(
+    async (draftOverride?: WizardDraft) => {
+      const draftToPreview = draftOverride ?? wizardDraftRef.current;
+      if (!draftToPreview) {
+        return;
+      }
+
+      const requestId = previewRequestIdRef.current + 1;
+      previewRequestIdRef.current = requestId;
+      setWizardPreviewPending(true);
+      setWizardPreviewError(null);
+
+      try {
+        const preview = await invoke<string>("generate_config_preview", {
+          draft: toConfigDraft(draftToPreview),
+        });
+
+        if (previewRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setWizardPreview(preview);
+        setWizardPreviewDirty(false);
+      } catch (error) {
+        if (previewRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setWizardPreview(null);
+        setWizardPreviewError(toErrorMessage(error));
+      } finally {
+        if (previewRequestIdRef.current === requestId) {
+          setWizardPreviewPending(false);
+        }
+      }
+    },
+    []
+  );
+
+  const enterWizardLocally = useCallback(
+    (inspection: ProjectInspection) => {
+      const nextDraft = buildWizardDraft(inspection);
+
+      setProject(inspection);
+      setRestoreError(null);
+      setWizardDraft(nextDraft);
+      setWizardPreview(null);
+      setWizardPreviewError(null);
+      setWizardPreviewPending(false);
+      setWizardPreviewDirty(false);
+      setWizardSavePending(false);
+      setScreen("wizard");
+
+      void refreshWizardPreview(nextDraft);
+    },
+    [refreshWizardPreview]
+  );
+
   const enterWorkspaceLocally = useCallback(
     async (baseState: WorkspaceAppState, inspection: ProjectInspection) => {
       setProject(inspection);
-      setWizardDraft(null);
+      clearWizardState();
       setRestoreError(null);
       await bindCurrentProjectWindow(inspection.path);
       await persistAppState(baseState, inspection);
       setScreen("workspace");
     },
-    [bindCurrentProjectWindow, persistAppState]
+    [bindCurrentProjectWindow, clearWizardState, persistAppState]
   );
 
   const openProject = useCallback(
     async (path: string) => {
       try {
         const inspection = await inspectProject(path);
+        const currentAppState = appStateRef.current;
+        const currentProject = projectRef.current;
 
         if (!inspection.exists) {
           setProject(null);
-          setWizardDraft(null);
+          clearWizardState();
           setRestoreError(`Project folder ${inspection.path} does not exist`);
           setScreen("invalid");
           return;
         }
 
-        if (!project || project.path !== inspection.path) {
+        if (!inspection.has_config && (!currentProject || currentProject.path === inspection.path)) {
+          enterWizardLocally(inspection);
+          return;
+        }
+
+        if (!currentProject || currentProject.path !== inspection.path) {
           await routeToProjectWindow(inspection.path);
-          await persistAppState(appState, inspection);
+          await persistAppState(currentAppState, inspection);
           setRestoreError(null);
           return;
         }
@@ -179,18 +353,23 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         setRestoreError(null);
 
         if (inspection.has_config) {
-          await enterWorkspaceLocally(appState, inspection);
+          await enterWorkspaceLocally(currentAppState, inspection);
           return;
         }
 
-        setProject(inspection);
-        setWizardDraft(buildWizardDraft(inspection));
-        setScreen("wizard");
+        enterWizardLocally(inspection);
       } catch (error) {
         setRestoreError(toErrorMessage(error));
       }
     },
-    [appState, enterWorkspaceLocally, inspectProject, persistAppState, project, routeToProjectWindow]
+    [
+      clearWizardState,
+      enterWizardLocally,
+      enterWorkspaceLocally,
+      inspectProject,
+      persistAppState,
+      routeToProjectWindow,
+    ]
   );
 
   const openFolder = useCallback(async () => {
@@ -209,9 +388,29 @@ export function useWorkspaceSession(): WorkspaceSessionState {
     [openProject]
   );
 
+  const updateWizardCommand = useCallback(
+    (commandId: string, updates: WizardCommandUpdate) => {
+      setWizardDraft((currentDraft) => {
+        if (!currentDraft) {
+          return currentDraft;
+        }
+
+        return {
+          ...currentDraft,
+          commands: currentDraft.commands.map((command) =>
+            command.id === commandId ? { ...command, ...updates } : command
+          ),
+        };
+      });
+      setWizardPreviewDirty(true);
+    },
+    []
+  );
+
   const saveWizardConfig = useCallback(
     async (draftOverride?: WizardDraft) => {
-      if (!project) {
+      const currentProject = projectRef.current;
+      if (!currentProject) {
         return;
       }
 
@@ -220,10 +419,13 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         return;
       }
 
-      try {
-        await invoke<string>("save_config", toSaveConfigRequest(project.path, draftToSave));
+      setWizardSavePending(true);
+      setRestoreError(null);
 
-        const refreshedInspection = await inspectProject(project.path);
+      try {
+        await invoke<string>("save_config", toSaveConfigRequest(currentProject.path, draftToSave));
+
+        const refreshedInspection = await inspectProject(currentProject.path);
         setProject(refreshedInspection);
 
         if (!refreshedInspection.has_config) {
@@ -232,15 +434,17 @@ export function useWorkspaceSession(): WorkspaceSessionState {
           return;
         }
 
-        await enterWorkspaceLocally(appState, refreshedInspection);
+        await enterWorkspaceLocally(appStateRef.current, refreshedInspection);
       } catch (error) {
-        setProject(project);
+        setProject(currentProject);
         setWizardDraft(draftToSave);
         setRestoreError(toErrorMessage(error));
         setScreen("wizard");
+      } finally {
+        setWizardSavePending(false);
       }
     },
-    [appState, enterWorkspaceLocally, inspectProject, project, wizardDraft]
+    [enterWorkspaceLocally, inspectProject, wizardDraft]
   );
 
   useEffect(() => {
@@ -276,10 +480,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         }
 
         if (!inspection.has_config) {
-          setProject(inspection);
-          setWizardDraft(buildWizardDraft(inspection));
-          setRestoreError(null);
-          setScreen("wizard");
+          enterWizardLocally(inspection);
           return;
         }
 
@@ -311,7 +512,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         }
 
         setProject(null);
-        setWizardDraft(null);
+        clearWizardState();
         setRestoreError(toErrorMessage(error));
         setAppState(loadedState);
         setScreen("invalid");
@@ -323,7 +524,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
     return () => {
       cancelled = true;
     };
-  }, [enterWorkspaceLocally, inspectProject, routeToProjectWindow]);
+  }, [clearWizardState, enterWizardLocally, enterWorkspaceLocally, inspectProject, routeToProjectWindow]);
 
   return {
     screen,
@@ -331,8 +532,15 @@ export function useWorkspaceSession(): WorkspaceSessionState {
     project,
     restoreError,
     wizardDraft,
+    wizardPreview,
+    wizardPreviewError,
+    wizardPreviewPending,
+    wizardPreviewDirty,
+    wizardSavePending,
     openFolder,
     openRecentProject,
+    updateWizardCommand,
+    refreshWizardPreview,
     saveWizardConfig,
   };
 }

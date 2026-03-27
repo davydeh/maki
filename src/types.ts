@@ -44,19 +44,32 @@ export interface ProjectInspection {
   entrypoint_hints: string[];
 }
 
+export type DetectedCommandSource = "script_hint" | "entrypoint_hint" | "manual";
+
 export interface DetectedCommand {
   id: string;
   name: string;
   cmd: string;
   enabled: boolean;
   autostart: boolean;
-  source: "detected" | "manual";
+  source: DetectedCommandSource;
 }
 
 export interface WizardDraft {
   project_name: string;
   theme?: string;
   commands: DetectedCommand[];
+}
+
+export type WizardCommandUpdate = Partial<
+  Pick<DetectedCommand, "name" | "cmd" | "enabled" | "autostart">
+>;
+
+export interface WizardPreviewState {
+  yaml: string | null;
+  error: string | null;
+  isLoading: boolean;
+  isDirty: boolean;
 }
 
 export type AppScreen = "booting" | "picker" | "wizard" | "workspace" | "invalid";

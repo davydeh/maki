@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { ConfigWizardView } from "./components/ConfigWizardView";
 import { ProjectPickerView } from "./components/ProjectPickerView";
 import { StatusBar } from "./components/StatusBar";
 import { TabBar } from "./components/TabBar";
@@ -281,11 +282,32 @@ export default function App() {
   }
 
   if (session.screen === "wizard") {
+    if (session.project && session.wizardDraft) {
+      return (
+        <div style={createShellVars(theme)}>
+          <ConfigWizardView
+            project={session.project}
+            restoreError={session.restoreError}
+            wizardDraft={session.wizardDraft}
+            wizardPreview={session.wizardPreview}
+            wizardPreviewError={session.wizardPreviewError}
+            wizardPreviewPending={session.wizardPreviewPending}
+            wizardPreviewDirty={session.wizardPreviewDirty}
+            wizardSavePending={session.wizardSavePending}
+            onUpdateCommand={session.updateWizardCommand}
+            onRefreshPreview={session.refreshWizardPreview}
+            onSave={session.saveWizardConfig}
+            onOpenFolder={session.openFolder}
+          />
+        </div>
+      );
+    }
+
     return (
       <ShellView
         theme={theme}
         title={session.project ? `Set Up ${session.project.name}` : "Set Up A Workspace"}
-        description="This project needs a maki.yaml before the workspace can boot. The config wizard UI is intentionally left for the next task."
+        description="Preparing the workspace configuration wizard."
       >
         {session.restoreError && (
           <div className="shell-error-banner" role="alert">
