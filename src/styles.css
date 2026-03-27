@@ -4,12 +4,557 @@
   box-sizing: border-box;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
 
+:root {
+  color-scheme: dark;
+  --shell-bg: #1e1e2e;
+  --shell-fg: #cdd6f4;
+  --shell-surface: #181825;
+  --shell-surface-strong: #313244;
+  --shell-muted: #6c7086;
+  --shell-accent: #89b4fa;
+  --shell-border: #313244;
+  --shell-danger: #f38ba8;
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  background: var(--shell-bg);
+  color: var(--shell-fg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* --- Command bar (bottom, above status bar) --- */
+
+.command-bar {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 2px 4px;
+  gap: 2px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--shell-surface) 85%, black 15%),
+    var(--shell-surface)
+  );
+  font-size: 12px;
+  border-top: 1px solid var(--shell-border);
+  overflow: hidden;
+}
+
+.command-bar__group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.command-bar__group::-webkit-scrollbar {
+  display: none;
+}
+
+.command-bar__empty {
+  color: var(--shell-muted);
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.command-pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 10px;
+  min-width: 120px;
+  border: none;
+  border-radius: 2px;
+  background: rgba(205, 214, 244, 0.06);
+  white-space: nowrap;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.command-pill:hover {
+  background: rgba(205, 214, 244, 0.1);
+}
+
+.command-pill__indicator {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  bottom: 2px;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+}
+
+.command-pill__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Dot visible by default, action hidden */
+.command-pill__action-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* On hover: hide dot, show action */
+.command-pill:hover .command-pill__dot {
+  display: none;
+}
+
+.command-pill:hover .command-pill__action-btn {
+  display: flex;
+}
+
+.command-pill__indicator:hover {
+  background: rgba(205, 214, 244, 0.1);
+}
+
+.command-launcher-trigger {
+  display: inline-flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border: 1px solid var(--shell-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--shell-surface-strong) 55%, transparent);
+  color: var(--shell-fg);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.command-launcher-trigger:hover {
+  border-color: color-mix(
+    in srgb,
+    var(--shell-accent) 60%,
+    var(--shell-border)
+  );
+}
+
+.command-launcher-trigger__hint {
+  color: var(--shell-muted);
+  margin-left: 12px;
+}
+
+.command-launcher {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(10, 10, 16, 0.58);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 16px 16px;
+}
+
+.command-launcher__panel {
+  width: min(700px, 100%);
+  max-height: min(72vh, 640px);
+  border: 1px solid;
+  border-radius: 12px;
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.command-launcher__input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid;
+}
+
+.command-launcher__input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--shell-fg);
+  font-size: 14px;
+}
+
+.command-launcher__hint {
+  color: var(--shell-muted);
+  font-size: 11px;
+}
+
+.command-launcher__list {
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.command-launcher__item {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--shell-surface-strong) 50%, transparent);
+  text-align: left;
+  cursor: pointer;
+}
+
+.command-launcher__item:hover,
+.command-launcher__item.is-active {
+  background: color-mix(in srgb, var(--shell-surface-strong) 88%, transparent);
+}
+
+.command-launcher__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.command-launcher__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-launcher__run {
+  color: var(--shell-muted);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.command-launcher__empty {
+  padding: 16px 12px;
+  color: var(--shell-muted);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+/* --- Shared shell screens --- */
+
+.shell-screen {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: var(--shell-bg);
+  color: var(--shell-fg);
+}
+
+.shell-panel {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 32px;
+  border: 1px solid var(--shell-border);
+  border-radius: 12px;
+  background: var(--shell-surface);
+}
+
+.shell-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shell-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--shell-accent);
+}
+
+.shell-title {
+  font-size: clamp(24px, 4vw, 30px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.shell-subtitle {
+  max-width: 56ch;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--shell-muted);
+}
+
+.shell-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shell-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.shell-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--shell-muted);
+}
+
+.shell-field {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--shell-border);
+  border-radius: 8px;
+  background: var(--shell-surface-strong);
+  color: var(--shell-fg);
+  line-height: 1.5;
+}
+
+.shell-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--shell-accent);
+  color: #11111b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 100ms ease;
+}
+
+.shell-button:hover {
+  filter: brightness(1.1);
+}
+
+.shell-button:focus-visible,
+.project-picker__card:focus-visible,
+.project-picker__row:focus-visible {
+  outline: 2px solid var(--shell-accent);
+  outline-offset: 2px;
+}
+
+.shell-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.shell-error-banner {
+  padding: 10px 14px;
+  border: 1px solid rgba(243, 139, 168, 0.3);
+  border-radius: 8px;
+  background: rgba(243, 139, 168, 0.1);
+  color: #f5c2e7;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* --- Project Picker --- */
+
+.project-picker {
+  max-height: min(640px, calc(100vh - 64px));
+  gap: 0;
+}
+
+.project-picker__body {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+}
+
+.project-picker__header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0 4px;
+}
+
+.project-picker__brand {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+  color: var(--shell-accent);
+}
+
+/* Action cards row */
+
+.project-picker__actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.project-picker__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 140px;
+  padding: 20px;
+  border: 1px solid var(--shell-border);
+  border-radius: 8px;
+  background: var(--shell-surface-strong);
+  color: var(--shell-fg);
+  cursor: pointer;
+  transition:
+    border-color 100ms ease,
+    background-color 100ms ease;
+}
+
+.project-picker__card:hover {
+  border-color: var(--shell-accent);
+  background: rgba(49, 50, 68, 0.8);
+}
+
+.project-picker__card-icon {
+  color: var(--shell-muted);
+}
+
+.project-picker__card-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--shell-fg);
+}
+
+/* Recent projects section */
+
+.project-picker__recents {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+  border-top: 1px solid var(--shell-border);
+}
+
+.project-picker__recents-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 2px 6px;
+}
+
+.project-picker__recents-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--shell-muted);
+}
+
+.project-picker__recents-count {
+  font-size: 12px;
+  color: var(--shell-muted);
+}
+
+/* Flat list of recent project rows */
+
+.project-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.project-picker__row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+
+.project-picker__row:hover {
+  background: var(--shell-surface-strong);
+}
+
+.project-picker__name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--shell-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-picker__path {
+  font-size: 12px;
+  color: var(--shell-muted);
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.project-picker__empty {
+  font-size: 13px;
+  color: var(--shell-muted);
+  padding: 10px 12px;
+}
+
+@media (max-width: 640px) {
+  .shell-screen {
+    padding: 20px;
+  }
+
+  .shell-panel {
+    padding: 24px;
+  }
+
+  .project-picker {
+    max-height: calc(100vh - 40px);
+  }
 }

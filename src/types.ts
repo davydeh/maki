@@ -5,6 +5,86 @@ export interface MakiConfig {
   shells: ShellConfig[];
 }
 
+export interface RecentProject {
+  name: string;
+  path: string;
+}
+
+export interface WorkspaceAppState {
+  version: number;
+  last_project_path: string | null;
+  recent_projects: RecentProject[];
+}
+
+export type DetectionSignal =
+  | {
+      stack: "node";
+      package_json?: string | null;
+      scripts: string[];
+    }
+  | {
+      stack: "laravel";
+      composer_json?: string | null;
+      artisan: boolean;
+    }
+  | {
+      stack: "python";
+      pyproject_toml?: string | null;
+      requirements_txt?: string | null;
+      entrypoints: string[];
+    };
+
+export interface ProjectInspection {
+  name: string;
+  path: string;
+  exists: boolean;
+  has_config: boolean;
+  detected_stacks: DetectionSignal[];
+  script_hints: string[];
+  entrypoint_hints: string[];
+}
+
+export type DetectedCommandSource = "script_hint" | "entrypoint_hint" | "manual";
+
+export interface DetectedCommand {
+  id: string;
+  name: string;
+  cmd: string;
+  enabled: boolean;
+  autostart: boolean;
+  source: DetectedCommandSource;
+}
+
+export interface WizardDraft {
+  project_name: string;
+  theme?: string;
+  commands: DetectedCommand[];
+}
+
+export type WizardCommandUpdate = Partial<
+  Pick<DetectedCommand, "name" | "cmd" | "enabled" | "autostart">
+>;
+
+export interface WizardPreviewState {
+  yaml: string | null;
+  error: string | null;
+  isLoading: boolean;
+  isDirty: boolean;
+}
+
+export type AppScreen = "booting" | "picker" | "wizard" | "workspace" | "invalid";
+
+export interface ProjectWindowContext {
+  project_path: string;
+  window_label: string;
+}
+
+export interface ProjectWindowOpenResult {
+  project_path: string;
+  window_label: string;
+  created: boolean;
+}
+
 export interface ProcessConfig {
   name: string;
   cmd: string;
@@ -21,6 +101,11 @@ export interface ShellConfig {
   cmd?: string;
 }
 
+export interface LoadedWorkspaceConfig {
+  projectRoot: string;
+  config: MakiConfig;
+}
+
 export type TabType = "process" | "shell";
 export type TabStatus = "running" | "stopped" | "errored";
 
@@ -33,7 +118,9 @@ export interface Tab {
   status: TabStatus;
   exitCode?: number;
   autostart: boolean;
+  transient?: boolean;
   sessionId?: number;
+  workspacePath?: string;
   cwd?: string;
   env?: Record<string, string>;
 }

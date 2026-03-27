@@ -5,6 +5,7 @@ export interface Theme {
   bg: string;
   fg: string;
   tabBarBg: string;
+  inactiveTabBg: string;
   activeTabBg: string;
   activeTabFg: string;
   tabFg: string;
@@ -25,6 +26,7 @@ export const themes: Record<string, Theme> = {
     bg: "#1e1e2e",
     fg: "#cdd6f4",
     tabBarBg: "#181825",
+    inactiveTabBg: "#1e1f2d",
     activeTabBg: "#313244",
     activeTabFg: "#cdd6f4",
     tabFg: "#6c7086",
@@ -64,6 +66,7 @@ export const themes: Record<string, Theme> = {
     bg: "#eff1f5",
     fg: "#4c4f69",
     tabBarBg: "#e6e9ef",
+    inactiveTabBg: "#eceff5",
     activeTabBg: "#ccd0da",
     activeTabFg: "#4c4f69",
     tabFg: "#7c7f93",
@@ -103,6 +106,7 @@ export const themes: Record<string, Theme> = {
     bg: "#2e3440",
     fg: "#d8dee9",
     tabBarBg: "#3b4252",
+    inactiveTabBg: "#3f4657",
     activeTabBg: "#434c5e",
     activeTabFg: "#eceff4",
     tabFg: "#7b88a1",
