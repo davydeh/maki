@@ -137,6 +137,9 @@ describe("useWorkspaceSession", () => {
       get_current_project_window: createCurrentWindow({
         project_path: inspection.path,
       }),
+      bind_current_project_window: createCurrentWindow({
+        project_path: inspection.path,
+      }),
       save_app_state: state,
     });
 
@@ -148,6 +151,9 @@ describe("useWorkspaceSession", () => {
 
     expect(result.current.project).toEqual(inspection);
     expect(result.current.appState).toEqual(state);
+    expect(invokeMock).toHaveBeenCalledWith("bind_current_project_window", {
+      projectPath: inspection.path,
+    });
     expect(invokeMock).toHaveBeenCalledWith("save_app_state", {
       state: expect.objectContaining({
         last_project_path: inspection.path,
@@ -267,6 +273,9 @@ describe("useWorkspaceSession", () => {
       load_app_state: state,
       inspect_project_folder: inspection,
       get_current_project_window: new Error("Window project not bound"),
+      bind_current_project_window: createCurrentWindow({
+        project_path: inspection.path,
+      }),
       save_app_state: state,
     });
 
@@ -280,6 +289,9 @@ describe("useWorkspaceSession", () => {
       "open_project_window",
       expect.anything()
     );
+    expect(invokeMock).toHaveBeenCalledWith("bind_current_project_window", {
+      projectPath: inspection.path,
+    });
     expect(result.current.project).toEqual(inspection);
   });
 
@@ -346,6 +358,9 @@ describe("useWorkspaceSession", () => {
       load_app_state: state,
       inspect_project_folder: [inspection, savedInspection],
       save_config: "/projects/alpha/maki.yaml",
+      bind_current_project_window: createCurrentWindow({
+        project_path: savedInspection.path,
+      }),
       save_app_state: createAppState({
         last_project_path: "/projects/alpha",
         recent_projects: [createRecentProject()],
@@ -378,6 +393,9 @@ describe("useWorkspaceSession", () => {
           ],
         },
       },
+    });
+    expect(invokeMock).toHaveBeenCalledWith("bind_current_project_window", {
+      projectPath: savedInspection.path,
     });
     expect(result.current.screen).toBe("workspace");
     expect(result.current.project).toEqual(savedInspection);
@@ -452,6 +470,9 @@ describe("useWorkspaceSession", () => {
       load_app_state: state,
       inspect_project_folder: [currentInspection, otherInspection],
       get_current_project_window: createCurrentWindow({
+        project_path: current.path,
+      }),
+      bind_current_project_window: createCurrentWindow({
         project_path: current.path,
       }),
       save_app_state: [

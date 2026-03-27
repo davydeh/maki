@@ -134,9 +134,27 @@ export function useWorkspaceSession(): WorkspaceSessionState {
     });
   }, []);
 
+  const bindCurrentProjectWindow = useCallback(async (projectPath: string) => {
+    return invoke<ProjectWindowContext>("bind_current_project_window", {
+      projectPath,
+    });
+  }, []);
+
   const inspectProject = useCallback(async (path: string) => {
     return invoke<ProjectInspection>("inspect_project_folder", { path });
   }, []);
+
+  const enterWorkspaceLocally = useCallback(
+    async (baseState: WorkspaceAppState, inspection: ProjectInspection) => {
+      setProject(inspection);
+      setWizardDraft(null);
+      setRestoreError(null);
+      await bindCurrentProjectWindow(inspection.path);
+      await persistAppState(baseState, inspection);
+      setScreen("workspace");
+    },
+    [bindCurrentProjectWindow, persistAppState]
+  );
 
   const openProject = useCallback(
     async (path: string) => {
@@ -161,10 +179,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         setRestoreError(null);
 
         if (inspection.has_config) {
-          setWizardDraft(null);
-          setProject(inspection);
-          await persistAppState(appState, inspection);
-          setScreen("workspace");
+          await enterWorkspaceLocally(appState, inspection);
           return;
         }
 
@@ -175,7 +190,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         setRestoreError(toErrorMessage(error));
       }
     },
-    [appState, inspectProject, persistAppState, project, routeToProjectWindow]
+    [appState, enterWorkspaceLocally, inspectProject, persistAppState, project, routeToProjectWindow]
   );
 
   const openFolder = useCallback(async () => {
@@ -216,12 +231,9 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         return;
       }
 
-      setRestoreError(null);
-      setWizardDraft(null);
-      await persistAppState(appState, refreshedInspection);
-      setScreen("workspace");
+      await enterWorkspaceLocally(appState, refreshedInspection);
     },
-    [appState, inspectProject, persistAppState, project, wizardDraft]
+    [appState, enterWorkspaceLocally, inspectProject, project, wizardDraft]
   );
 
   useEffect(() => {
@@ -281,13 +293,10 @@ export function useWorkspaceSession(): WorkspaceSessionState {
           return;
         }
 
-        setProject(inspection);
-        setWizardDraft(null);
-        setRestoreError(null);
-        await persistAppState(loadedState, inspection);
+        await enterWorkspaceLocally(loadedState, inspection);
 
-        if (!cancelled) {
-          setScreen("workspace");
+        if (cancelled) {
+          return;
         }
       } catch (error) {
         if (cancelled) {
@@ -307,7 +316,7 @@ export function useWorkspaceSession(): WorkspaceSessionState {
     return () => {
       cancelled = true;
     };
-  }, [inspectProject, persistAppState, routeToProjectWindow]);
+  }, [enterWorkspaceLocally, inspectProject, routeToProjectWindow]);
 
   return {
     screen,
