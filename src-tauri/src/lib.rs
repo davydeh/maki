@@ -1,4 +1,5 @@
-use tauri::Manager;
+use tauri::{Emitter, Manager};
+use tauri::menu::{MenuBuilder, MenuItem, SubmenuBuilder};
 
 mod config;
 mod git;
@@ -12,6 +13,50 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(pty::PtyState::default())
         .manage(windows::ProjectWindowRegistry::default())
+        .setup(|app| {
+            let new_window = MenuItem::with_id(app, "new-window", "New Window", true, Some("CmdOrCtrl+N"))?;
+            let new_tab = MenuItem::with_id(app, "new-tab", "New Tab", true, Some("CmdOrCtrl+T"))?;
+            let split_right = MenuItem::with_id(app, "split-right", "Split Right", true, Some("CmdOrCtrl+D"))?;
+            let split_down = MenuItem::with_id(app, "split-down", "Split Down", true, Some("CmdOrCtrl+Shift+D"))?;
+            let close_tab = MenuItem::with_id(app, "close-tab", "Close", true, Some("CmdOrCtrl+W"))?;
+
+            let file_menu = SubmenuBuilder::new(app, "File")
+                .item(&new_window)
+                .item(&new_tab)
+                .separator()
+                .item(&split_right)
+                .item(&split_down)
+                .separator()
+                .item(&close_tab)
+                .build()?;
+
+            let edit_menu = SubmenuBuilder::new(app, "Edit")
+                .copy()
+                .paste()
+                .select_all()
+                .build()?;
+
+            let window_menu = SubmenuBuilder::new(app, "Window")
+                .minimize()
+                .maximize()
+                .close_window()
+                .build()?;
+
+            let menu = MenuBuilder::new(app)
+                .item(&file_menu)
+                .item(&edit_menu)
+                .item(&window_menu)
+                .build()?;
+
+            app.set_menu(menu)?;
+
+            app.on_menu_event(move |app_handle, event| {
+                let id = event.id().0.as_str();
+                let _ = app_handle.emit("menu-action", id);
+            });
+
+            Ok(())
+        })
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 let registry = window.state::<windows::ProjectWindowRegistry>();

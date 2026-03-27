@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { ConfigWizardView } from "./components/ConfigWizardView";
 import { ProjectPickerView } from "./components/ProjectPickerView";
 import { StatusBar } from "./components/StatusBar";
@@ -280,7 +281,29 @@ export default function App() {
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+
+    // Listen for native menu actions
+    let unlistenMenu: (() => void) | null = null;
+    listen<string>("menu-action", (event) => {
+      switch (event.payload) {
+        case "new-tab":
+          handleNewTab();
+          break;
+        case "close-tab":
+          if (activeTabId && tabs.length > 1) {
+            handleTabClose(activeTabId);
+          }
+          break;
+        case "new-window":
+          handleOpenFolder();
+          break;
+      }
+    }).then((fn) => { unlistenMenu = fn; });
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      unlistenMenu?.();
+    };
   }, [activeTabId, handleNewTab, handleOpenFolder, handleTabClose, session.screen, tabs]);
 
   if (session.screen === "picker" || session.screen === "invalid") {
