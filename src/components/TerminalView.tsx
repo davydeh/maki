@@ -126,11 +126,23 @@ export function TerminalView({
       }
     })();
 
-    // Shell keybindings (Ghostty/iTerm2-like)
+    // Shell keybindings (Ghostty/iTerm2-like) + CSI u for modifier keys
     if (typeof term.attachCustomKeyEventHandler !== "function") {
       // Test environment — skip keybinding setup
     } else term.attachCustomKeyEventHandler((event) => {
       if (event.type !== "keydown") return true;
+      const sid = sessionIdRef.current;
+      const send = (data: string) => {
+        if (sid !== null) void invoke("write_pty", { sessionId: sid, data });
+      };
+
+      // Shift+Enter — send CSI u encoded (kitty keyboard protocol)
+      // Claude Code uses this to distinguish newline from submit
+      if (event.shiftKey && !event.metaKey && !event.altKey && event.key === "Enter") {
+        event.preventDefault();
+        send("\x1b[13;2u");
+        return false;
+      }
 
       // Cmd+K — clear terminal
       if (event.metaKey && event.key === "k") {
@@ -139,57 +151,45 @@ export function TerminalView({
         return false;
       }
 
-      // Cmd+Left — move to line start (send Home / Ctrl+A)
+      // Cmd+Left — move to line start (Ctrl+A)
       if (event.metaKey && event.key === "ArrowLeft") {
         event.preventDefault();
-        if (sessionIdRef.current !== null) {
-          void invoke("write_pty", { sessionId: sessionIdRef.current, data: "\x01" });
-        }
+        send("\x01");
         return false;
       }
 
-      // Cmd+Right — move to line end (send End / Ctrl+E)
+      // Cmd+Right — move to line end (Ctrl+E)
       if (event.metaKey && event.key === "ArrowRight") {
         event.preventDefault();
-        if (sessionIdRef.current !== null) {
-          void invoke("write_pty", { sessionId: sessionIdRef.current, data: "\x05" });
-        }
+        send("\x05");
         return false;
       }
 
-      // Option+Left — word back (send ESC b)
+      // Option+Left — word back (ESC b)
       if (event.altKey && event.key === "ArrowLeft") {
         event.preventDefault();
-        if (sessionIdRef.current !== null) {
-          void invoke("write_pty", { sessionId: sessionIdRef.current, data: "\x1bb" });
-        }
+        send("\x1bb");
         return false;
       }
 
-      // Option+Right — word forward (send ESC f)
+      // Option+Right — word forward (ESC f)
       if (event.altKey && event.key === "ArrowRight") {
         event.preventDefault();
-        if (sessionIdRef.current !== null) {
-          void invoke("write_pty", { sessionId: sessionIdRef.current, data: "\x1bf" });
-        }
+        send("\x1bf");
         return false;
       }
 
-      // Option+Backspace — delete word back (send ESC DEL)
+      // Option+Backspace — delete word back (ESC DEL)
       if (event.altKey && event.key === "Backspace") {
         event.preventDefault();
-        if (sessionIdRef.current !== null) {
-          void invoke("write_pty", { sessionId: sessionIdRef.current, data: "\x1b\x7f" });
-        }
+        send("\x1b\x7f");
         return false;
       }
 
-      // Cmd+Backspace — delete to line start (send Ctrl+U)
+      // Cmd+Backspace — delete to line start (Ctrl+U)
       if (event.metaKey && event.key === "Backspace") {
         event.preventDefault();
-        if (sessionIdRef.current !== null) {
-          void invoke("write_pty", { sessionId: sessionIdRef.current, data: "\x15" });
-        }
+        send("\x15");
         return false;
       }
 
