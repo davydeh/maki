@@ -32,6 +32,8 @@ pub fn run() {
             pty::write_pty,
             pty::resize_pty,
             pty::kill_pty,
+            windows::bind_current_project_window,
+            windows::get_current_project_window,
             windows::open_project_window,
         ])
         .run(tauri::generate_context!())
