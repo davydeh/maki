@@ -276,9 +276,8 @@ export function TerminalView({
 
     if (active) {
       requestAnimationFrame(() => {
-        fitRef.current?.fit();
-        // Load WebGL for active tab only (powerline glyphs, perf)
-        // Only 1 GPU context at a time — well under the ~16 limit
+        // Load WebGL BEFORE fit — WebGL changes cell dimensions,
+        // so fitting first would calculate wrong column count
         if (!webglRef.current) {
           try {
             const webgl = new WebglAddon();
@@ -292,6 +291,7 @@ export function TerminalView({
             // Canvas fallback — no action needed
           }
         }
+        fitRef.current?.fit();
         if (typeof term.focus === "function") term.focus();
       });
     } else {
