@@ -132,26 +132,8 @@ export function TerminalView({
       );
       unlisteners.push(unlisten2);
 
-      // Listeners are ready — spawn PTY now if workspace is already active at
-      // mount time (the common v0.2 path where TerminalView only renders in the
-      // workspace branch of App.tsx).
-      if (autostart && workspaceActive && sessionIdRef.current === null) {
-        try {
-          const sessionId = await invoke<number>("spawn_pty", {
-            cmd,
-            args,
-            cols: term.cols,
-            rows: term.rows,
-            cwd: cwd || null,
-            env: env || null,
-          });
-          sessionIdRef.current = sessionId;
-          onSessionCreated(tabId, sessionId);
-        } catch (e) {
-          term.write(`\x1b[31mError spawning process: ${e}\x1b[0m\r\n`);
-          onExit(tabId, -1);
-        }
-      }
+      // PTY spawning is deferred to the active effect (after fit) so the
+      // shell gets the correct terminal dimensions from the start.
     })();
 
     // Shell keybindings (Ghostty/iTerm2-like) + CSI u for modifier keys
@@ -261,34 +243,7 @@ export function TerminalView({
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Spawn PTY when workspace becomes active (handles v0.2 boot flow where
-  // workspaceActive is false at mount time and transitions to true later).
-  useEffect(() => {
-    if (!workspaceActive || !autostart) return;
-    if (sessionIdRef.current !== null) return; // already spawned
-    const term = termRef.current;
-    if (!term) return;
-
-    (async () => {
-      try {
-        const sessionId = await invoke<number>("spawn_pty", {
-          cmd,
-          args,
-          cols: term.cols,
-          rows: term.rows,
-          cwd: cwd || null,
-          env: env || null,
-        });
-        sessionIdRef.current = sessionId;
-        onSessionCreated(tabId, sessionId);
-      } catch (e) {
-        term.write(`\x1b[31mError spawning process: ${e}\x1b[0m\r\n`);
-        onExit(tabId, -1);
-      }
-    })();
-  }, [workspaceActive]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Focus, resize, and manage WebGL when tab becomes active
+  // Focus, resize, manage WebGL, and spawn PTY when tab becomes active
   useEffect(() => {
     const term = termRef.current;
     if (!term) return;
@@ -315,6 +270,24 @@ export function TerminalView({
         debugFit("active-post-fit");
         if (typeof term.focus === "function") term.focus();
 
+        // Spawn PTY AFTER fit so the shell gets correct dimensions
+        if (autostart && workspaceActive && sessionIdRef.current === null) {
+          invoke<number>("spawn_pty", {
+            cmd,
+            args,
+            cols: term.cols,
+            rows: term.rows,
+            cwd: cwd || null,
+            env: env || null,
+          }).then((sessionId) => {
+            sessionIdRef.current = sessionId;
+            onSessionCreated(tabId, sessionId);
+          }).catch((e) => {
+            term.write(`\x1b[31mError spawning process: ${e}\x1b[0m\r\n`);
+            onExit(tabId, -1);
+          });
+        }
+
         // Second fit after WebGL texture atlas initializes
         requestAnimationFrame(() => {
           debugFit("active-2nd-raf-pre");
@@ -329,7 +302,7 @@ export function TerminalView({
         webglRef.current = null;
       }
     }
-  }, [active]);
+  }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ResizeObserver re-fits terminal when container dimensions change
   // (window resize, layout shifts, title bar added/removed)
