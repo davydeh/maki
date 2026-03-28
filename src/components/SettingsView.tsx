@@ -135,7 +135,12 @@ function IconPicker({
 let nextCommandId = 0;
 
 function configToCommands(config: MakiConfig): SettingsCommand[] {
-  return config.processes.map((p) => ({
+  // Sort autostart commands to the top
+  const sorted = [...config.processes].sort((a, b) => {
+    if (a.autostart === b.autostart) return 0;
+    return a.autostart ? -1 : 1;
+  });
+  return sorted.map((p) => ({
     id: `settings-cmd-${nextCommandId++}`,
     name: p.name,
     cmd: p.cmd,
@@ -368,16 +373,23 @@ function CommandsSection({
 
                 <div className="settings__row-info">
                   <div className="settings__row-top">
-                    <span className="settings__row-name">
+                    <span className="settings__row-name" style={{ color: cmd.autostart ? theme.running : theme.fg }}>
                       {cmd.name || <em style={{ color: theme.stopped }}>Untitled</em>}
+                      {cmd.autostart && (
+                        <span
+                          title="This command starts automatically"
+                          className="settings__row-autostart"
+                        >
+                          <RefreshCw strokeWidth={2} size={12} style={{ color: theme.running, marginTop: "2px" }} />
+                        </span>
+                      )}
                     </span>
-                    <span className="settings__row-cmd">{cmd.cmd}</span>
+                    <span style={{ color: theme.stopped }}>•</span>
+                    <span className="settings__row-cmd">
+                      {cmd.cmd}
+                    </span>
                   </div>
-                  {cmd.autostart && (
-                    <span title="This command starts automatically" style={{ display: "flex", marginTop: "2px" }}>
-                      <RefreshCw size={13} style={{ color: theme.running }} />
-                    </span>
-                  )}
+
                 </div>
 
                 <button
