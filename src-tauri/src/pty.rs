@@ -54,6 +54,10 @@ pub fn spawn_pty(
         .map_err(|e| e.to_string())?;
 
     let mut cmd_builder = CommandBuilder::new(&cmd);
+    // Always spawn as login shell so .zprofile/.zshrc are sourced and PATH
+    // includes homebrew, nvm, etc. GUI apps on macOS get a minimal environment.
+    // For shells: `zsh -l`, for commands: `zsh -l -c "cmd"`.
+    cmd_builder.arg("-l");
     for arg in &args {
         cmd_builder.arg(arg);
     }
