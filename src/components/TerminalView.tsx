@@ -21,6 +21,8 @@ interface TerminalViewProps {
   workspaceActive: boolean;
   onSessionCreated: (tabId: string, sessionId: number) => void;
   onExit: (tabId: string, exitCode: number) => void;
+  onRestart: (tabId: string) => void;
+  onClose: (tabId: string) => void;
 }
 
 export function TerminalView({
@@ -35,6 +37,8 @@ export function TerminalView({
   workspaceActive,
   onSessionCreated,
   onExit,
+  onRestart,
+  onClose,
 }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -102,8 +106,26 @@ export function TerminalView({
         "pty-exit",
         (event) => {
           if (event.payload.session_id === sessionIdRef.current) {
-            term.write("\r\n\x1b[90m[process exited]\x1b[0m\r\n");
-            onExit(tabId, event.payload.exit_code);
+            const code = event.payload.exit_code;
+            const status = code === 0
+              ? "\x1b[32m✓ exited\x1b[0m"
+              : `\x1b[31m✗ exited (${code})\x1b[0m`;
+            term.write(`\r\n${status}\r\n`);
+            term.write("\x1b[90mPress \x1b[0mr\x1b[90m to restart, \x1b[0mq\x1b[90m to close\x1b[0m\r\n");
+
+            // Listen for keypress to restart or close
+            const disposable = term.onData((data) => {
+              const key = data.toLowerCase();
+              if (key === "r") {
+                disposable.dispose();
+                onRestart(tabId);
+              } else if (key === "q" || key === "w") {
+                disposable.dispose();
+                onClose(tabId);
+              }
+            });
+
+            onExit(tabId, code);
           }
         }
       );

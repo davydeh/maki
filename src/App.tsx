@@ -565,6 +565,8 @@ export default function App() {
             workspaceActive={session.screen === "workspace"}
             onSessionCreated={handleSessionCreated}
             onExit={handleExit}
+            onRestart={handleRunCommand}
+            onClose={handleTabClose}
           />
         ))}
       </div>
