@@ -512,6 +512,28 @@ export default function App() {
         backgroundColor: theme.bg,
       }}
     >
+      {/* Title bar text — left-aligned, sits in the native transparent title bar area */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          height: "28px",
+          paddingLeft: "72px",
+          backgroundColor: theme.bg,
+          color: theme.tabFg,
+          fontSize: "13px",
+          fontWeight: 500,
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          flexShrink: 0,
+        }}
+        data-tauri-drag-region
+      >
+        {tabs.find((t) => t.id === activeTabId)?.name ||
+          workspaceConfig.config.name ||
+          "maki"}
+      </div>
+
       <TabBar
         tabs={tabs}
         activeTabId={activeTabId}
