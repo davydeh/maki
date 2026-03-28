@@ -561,7 +561,7 @@ export default function App() {
             env={tab.env}
             theme={theme}
             autostart={tab.autostart}
-            active={tab.id === activeTabId}
+            active={tab.id === activeTabId && !settingsOpen}
             workspaceActive={session.screen === "workspace"}
             onSessionCreated={handleSessionCreated}
             onExit={handleExit}
