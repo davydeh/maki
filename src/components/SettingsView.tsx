@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import * as LucideIcons from "lucide-react";
-import { TerminalSquare, Trash2, Plus, X, Check } from "lucide-react";
+import { TerminalSquare, Trash2, Plus, X, Check, RefreshCw } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { Theme } from "../themes";
@@ -374,9 +374,8 @@ function CommandsSection({
                     <span className="settings__row-cmd">{cmd.cmd}</span>
                   </div>
                   {cmd.autostart && (
-                    <span className="settings__row-badge" style={{ color: theme.running }}>
-                      <span className="settings__row-badge-dot" style={{ background: theme.running }} />
-                      starts automatically
+                    <span title="This command starts automatically" style={{ display: "flex", marginTop: "2px" }}>
+                      <RefreshCw size={13} style={{ color: theme.running }} />
                     </span>
                   )}
                 </div>
