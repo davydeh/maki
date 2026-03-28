@@ -81,9 +81,11 @@ export function TerminalView({
       // Test environment — web links addon not available
     }
 
-    fitAddon.fit();
     termRef.current = term;
     fitRef.current = fitAddon;
+
+    // Delay initial fit to ensure container has final layout dimensions
+    requestAnimationFrame(() => fitAddon.fit());
 
     // Listen for PTY output
     const unlisteners: Array<() => void> = [];
@@ -300,12 +302,22 @@ export function TerminalView({
     }
   }, [active]);
 
+  // ResizeObserver re-fits terminal when container dimensions change
+  // (window resize, layout shifts, title bar added/removed)
   useEffect(() => {
-    const handleResize = () => {
-      if (active && fitRef.current) {
-        fitRef.current.fit();
-      }
-    };
+    const container = containerRef.current;
+    if (!container || !active) return;
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => {
+        fitRef.current?.fit();
+      });
+      observer.observe(container);
+      return () => observer.disconnect();
+    }
+
+    // Fallback for test environment
+    const handleResize = () => fitRef.current?.fit();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [active]);
