@@ -366,20 +366,20 @@ function CommandsSection({
               <div className="settings__row-collapsed" onClick={() => onToggle(cmd.id)}>
                 {(() => { const Icon = getLucideIcon(cmd.icon || "TerminalSquare"); return <Icon size={16} className="settings__row-icon" />; })()}
 
-                <div className="settings__row-top">
-                  <span className="settings__row-name" style={{ flexShrink: "0" }}>
-                    {cmd.name || <em style={{ color: theme.stopped }}>Untitled</em>}
-                  </span>
-
-                  <span className="settings__row-cmd">{cmd.cmd}</span>
+                <div className="settings__row-info">
+                  <div className="settings__row-top">
+                    <span className="settings__row-name">
+                      {cmd.name || <em style={{ color: theme.stopped }}>Untitled</em>}
+                    </span>
+                    <span className="settings__row-cmd">{cmd.cmd}</span>
+                  </div>
+                  {cmd.autostart && (
+                    <span className="settings__row-badge" style={{ color: theme.running }}>
+                      <span className="settings__row-badge-dot" style={{ background: theme.running }} />
+                      starts automatically
+                    </span>
+                  )}
                 </div>
-
-                {cmd.autostart && (
-                  <span className="settings__row-badge" style={{ color: theme.running }}>
-                    <span className="settings__row-badge-dot" style={{ background: theme.running }} />
-                    starts automatically
-                  </span>
-                )}
 
                 <button
                   className="settings__delete-btn"
