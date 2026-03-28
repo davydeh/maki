@@ -651,6 +651,8 @@ select {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--shell-border);
 }
 
 .settings__section-title {
@@ -677,6 +679,7 @@ select {
   border: 1px solid var(--shell-border);
   border-radius: 8px;
   overflow: hidden;
+  margin-bottom: 16px;
 }
 
 .settings__row {
@@ -703,15 +706,6 @@ select {
 .settings__row-icon {
   color: var(--shell-muted);
   flex-shrink: 0;
-}
-
-.settings__row-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 8px;
 }
 
 .settings__row-name {
@@ -809,6 +803,18 @@ select {
   background: none;
   font-size: 12px;
   cursor: pointer;
+}
+
+.settings__checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 2px solid;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background-color 100ms ease, border-color 100ms ease;
 }
 
 /* Empty state */

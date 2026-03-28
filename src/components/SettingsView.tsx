@@ -168,7 +168,7 @@ export function SettingsView({
 
   const handleAddCommand = () => {
     const id = `settings-cmd-${nextCommandId++}`;
-    setCommands((prev) => [...prev, { id, name: "", cmd: "", autostart: true }]);
+    setCommands((prev) => [{ id, name: "", cmd: "", autostart: false }, ...prev]);
     setExpandedId(id);
   };
 
@@ -326,10 +326,19 @@ function CommandsSection({
                   <button
                     className="settings__autostart-toggle"
                     onClick={() => onUpdate(cmd.id, { autostart: !cmd.autostart })}
-                    style={{ color: cmd.autostart ? theme.running : theme.stopped }}
                   >
-                    <Check size={14} />
-                    <span>Start automatically</span>
+                    <span
+                      className={`settings__checkbox ${cmd.autostart ? "is-checked" : ""}`}
+                      style={{
+                        borderColor: cmd.autostart ? theme.running : theme.stopped,
+                        background: cmd.autostart ? theme.running : "transparent",
+                      }}
+                    >
+                      {cmd.autostart && <Check size={10} style={{ color: theme.bg }} />}
+                    </span>
+                    <span style={{ color: cmd.autostart ? theme.running : theme.stopped }}>
+                      Start automatically
+                    </span>
                   </button>
                   <button
                     className="settings__delete-btn"
@@ -344,18 +353,17 @@ function CommandsSection({
               /* Collapsed / list mode */
               <div className="settings__row-collapsed" onClick={() => onToggle(cmd.id)}>
                 {(() => { const Icon = getLucideIcon(cmd.icon || "TerminalSquare"); return <Icon size={16} className="settings__row-icon" />; })()}
-                <div className="settings__row-info">
-                  <span className="settings__row-name">
-                    {cmd.name || <em style={{ color: theme.stopped }}>Untitled</em>}
+                <span className="settings__row-name">
+                  {cmd.name || <em style={{ color: theme.stopped }}>Untitled</em>}
+                </span>
+                <span className="settings__row-cmd">{cmd.cmd}</span>
+                {cmd.autostart && (
+                  <span className="settings__row-badge" style={{ color: theme.running }}>
+                    <span className="settings__row-badge-dot" style={{ background: theme.running }} />
+                    starts automatically
                   </span>
-                  <span className="settings__row-cmd">{cmd.cmd}</span>
-                  {cmd.autostart && (
-                    <span className="settings__row-badge" style={{ color: theme.running }}>
-                      <span className="settings__row-badge-dot" style={{ background: theme.running }} />
-                      starts automatically
-                    </span>
-                  )}
-                </div>
+                )}
+                <span style={{ flex: 1 }} />
                 <button
                   className="settings__delete-btn"
                   onClick={(e) => {
