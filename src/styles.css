@@ -17,6 +17,16 @@ body,
   width: 0;
 }
 
+/* Improve canvas text rendering in WKWebView */
+.xterm canvas {
+  -webkit-font-smoothing: antialiased;
+  image-rendering: auto;
+}
+
+.xterm {
+  -webkit-font-smoothing: antialiased;
+}
+
 :root {
   color-scheme: dark;
   --shell-bg: #1e1e2e;

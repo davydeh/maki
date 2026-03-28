@@ -48,8 +48,8 @@ export function TerminalView({
 
     const term = new Terminal({
       theme: theme.terminal,
-      fontFamily: '"SF Mono", "Menlo", "Monaco", monospace',
-      fontSize: 13,
+      fontFamily: '"Menlo", "SF Mono", "Monaco", monospace',
+      fontSize: 14,
       lineHeight: 1.2,
       cursorBlink: true,
       scrollback: 5000,
