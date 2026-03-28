@@ -195,13 +195,19 @@ pub async fn open_project_window(
                 label,
             } => {
                 let title = project_window_title(&canonical_path);
-                let build_result =
+                let builder =
                     WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
                         .title(&title)
                         .inner_size(900.0, 600.0)
                         .min_inner_size(500.0, 300.0)
-                        .resizable(true)
-                        .build();
+                        .resizable(true);
+
+                #[cfg(target_os = "macos")]
+                let builder = builder
+                    .title_bar_style(tauri::TitleBarStyle::Transparent)
+                    .theme(Some(tauri::Theme::Dark));
+
+                let build_result = builder.build();
 
                 let window = match build_result {
                     Ok(window) => window,
@@ -213,6 +219,26 @@ pub async fn open_project_window(
                         ));
                     }
                 };
+
+                // Match title bar to app background (#1e1e2e)
+                #[cfg(target_os = "macos")]
+                #[allow(deprecated)]
+                {
+                    use cocoa::appkit::{NSColor, NSWindow};
+                    use cocoa::base::{id, nil};
+
+                    let ns_window = window.ns_window().unwrap() as id;
+                    unsafe {
+                        let bg_color = NSColor::colorWithRed_green_blue_alpha_(
+                            nil,
+                            30.0 / 255.0,
+                            30.0 / 255.0,
+                            46.0 / 255.0,
+                            1.0,
+                        );
+                        ns_window.setBackgroundColor_(bg_color);
+                    }
+                }
 
                 window
                     .set_focus()
