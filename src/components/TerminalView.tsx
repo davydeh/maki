@@ -84,10 +84,6 @@ export function TerminalView({
     termRef.current = term;
     fitRef.current = fitAddon;
 
-    // Initial fit after open — single RAF is sufficient since useEffect
-    // runs after React commits DOM changes
-    requestAnimationFrame(() => fitAddon.fit());
-
     // Listen for PTY output
     const unlisteners: Array<() => void> = [];
 
@@ -293,6 +289,12 @@ export function TerminalView({
         }
         fitRef.current?.fit();
         if (typeof term.focus === "function") term.focus();
+
+        // Second fit after WebGL texture atlas initializes — the first fit
+        // may use stale cell metrics if WebGL hasn't fully rendered yet
+        requestAnimationFrame(() => {
+          fitRef.current?.fit();
+        });
       });
     } else {
       // Release GPU context for inactive tabs
