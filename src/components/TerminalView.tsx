@@ -3,6 +3,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { WebLinksAddon } from "@xterm/addon-web-links";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import "@xterm/xterm/css/xterm.css";
@@ -66,6 +67,18 @@ export function TerminalView({
       term.unicode.activeVersion = "11";
     } catch {
       // Test environment — unicode addon not available
+    }
+
+    // Cmd+Click to open URLs in default browser
+    try {
+      const webLinksAddon = new WebLinksAddon((event, uri) => {
+        if (event.metaKey) {
+          void invoke("open_url", { url: uri });
+        }
+      });
+      term.loadAddon(webLinksAddon);
+    } catch {
+      // Test environment — web links addon not available
     }
 
     fitAddon.fit();
