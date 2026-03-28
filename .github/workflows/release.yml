@@ -38,5 +38,5 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "maki ${{ github.ref_name }}"
           releaseBody: "See the [changelog](https://github.com/davydeh/maki/commits/${{ github.ref_name }}) for details."
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
