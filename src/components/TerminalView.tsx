@@ -328,7 +328,6 @@ export function TerminalView({
         display: active ? "block" : "none",
         width: "100%",
         height: "100%",
-        padding: "0 4px",
         backgroundColor: theme.terminal.background,
       }}
     />
