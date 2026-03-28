@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "maki",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "identifier": "com.davydeh.maki",
   "build": {
     "frontendDist": "../dist",
@@ -19,9 +19,7 @@
         "minHeight": 300,
         "resizable": true,
         "fullscreen": false,
-        "theme": "Dark",
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true
+        "theme": "Dark"
       }
     ],
     "security": {
