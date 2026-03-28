@@ -24,6 +24,9 @@ pub struct ProcessConfig {
     pub autostart: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
+    pub icon: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub cwd: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
@@ -424,6 +427,7 @@ fn config_from_draft(draft: ConfigDraft) -> Result<Config, String> {
             name: command.name,
             cmd: command.cmd,
             autostart: command.autostart,
+            icon: None,
             cwd: None,
             env: None,
             restart: None,

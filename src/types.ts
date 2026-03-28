@@ -89,6 +89,7 @@ export interface ProcessConfig {
   name: string;
   cmd: string;
   autostart: boolean;
+  icon?: string;
   cwd?: string;
   env?: Record<string, string>;
   restart?: string;

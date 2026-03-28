@@ -137,6 +137,7 @@ function configToCommands(config: MakiConfig): SettingsCommand[] {
     name: p.name,
     cmd: p.cmd,
     autostart: p.autostart,
+    icon: p.icon,
   }));
 }
 
@@ -190,6 +191,7 @@ export function SettingsView({
         name: c.name.trim(),
         cmd: c.cmd.trim(),
         autostart: c.autostart,
+        icon: c.icon || undefined,
       }));
     onSave({ processes, theme: selectedTheme });
   };
@@ -325,6 +327,7 @@ function CommandsSection({
                 <div className="settings__row-meta">
                   <button
                     className="settings__autostart-toggle"
+                    style={{ paddingLeft: '40px' }}
                     onClick={() => onUpdate(cmd.id, { autostart: !cmd.autostart })}
                   >
                     <span
@@ -336,7 +339,13 @@ function CommandsSection({
                     >
                       {cmd.autostart && <Check size={10} style={{ color: theme.bg }} />}
                     </span>
-                    <span style={{ color: cmd.autostart ? theme.running : theme.stopped }}>
+                    <span
+                      style={{
+                        color: cmd.autostart ? theme.running : theme.stopped,
+                        fontWeight: "500",
+                        fontSize: "14px",
+                      }}
+                    >
                       Start automatically
                     </span>
                   </button>
@@ -353,16 +362,20 @@ function CommandsSection({
               /* Collapsed / list mode */
               <div className="settings__row-collapsed" onClick={() => onToggle(cmd.id)}>
                 {(() => { const Icon = getLucideIcon(cmd.icon || "TerminalSquare"); return <Icon size={16} className="settings__row-icon" />; })()}
-                <span className="settings__row-name">
+
+                <span className="settings__row-name" style={{ flexShrink: "0" }}>
                   {cmd.name || <em style={{ color: theme.stopped }}>Untitled</em>}
                 </span>
+
                 <span className="settings__row-cmd">{cmd.cmd}</span>
+
                 {cmd.autostart && (
                   <span className="settings__row-badge" style={{ color: theme.running }}>
                     <span className="settings__row-badge-dot" style={{ background: theme.running }} />
                     starts automatically
                   </span>
                 )}
+
                 <span style={{ flex: 1 }} />
                 <button
                   className="settings__delete-btn"

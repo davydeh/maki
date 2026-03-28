@@ -924,8 +924,8 @@ select {
   top: 100%;
   left: 0;
   z-index: 60;
-  width: 260px;
-  max-height: 280px;
+  width: 390px;
+  max-height: 320px;
   margin-top: 4px;
   border: 1px solid;
   border-radius: 8px;
@@ -947,10 +947,11 @@ select {
 
 .icon-picker__grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(10, 1fr);
   gap: 2px;
   padding: 6px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .icon-picker__item {
