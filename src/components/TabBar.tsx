@@ -337,21 +337,8 @@ function CommandPill({
     <button
       className="command-pill"
       onClick={() => onFocusCommand(tab.id)}
-      style={{
-        color: isActive ? theme.fg : theme.tabFg,
-        fontWeight: isActive ? 600 : 400,
-      }}
     >
       <span className="command-pill__indicator">
-        <span
-          className="command-pill__dot"
-          style={{
-            width: "6px",
-            height: "6px",
-            borderRadius: "50%",
-            backgroundColor: dotColor,
-          }}
-        />
         {isRunning && (
           <span
             className="command-pill__action-btn"

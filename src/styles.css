@@ -88,6 +88,7 @@ body {
 }
 
 .command-pill {
+  /* color: var(--shell-muted);
   position: relative;
   display: flex;
   align-items: center;
@@ -96,27 +97,22 @@ body {
   padding: 4px 10px;
   min-width: 120px;
   border: none;
-  border-radius: 2px;
-  background: rgba(205, 214, 244, 0.06);
   white-space: nowrap;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 12px; */
 }
 
 .command-pill:hover {
-  background: rgba(205, 214, 244, 0.1);
+  /* background: rgba(205, 214, 244, 0.1); */
 }
 
 .command-pill__indicator {
-  position: absolute;
-  left: 2px;
-  top: 2px;
-  bottom: 2px;
-  aspect-ratio: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 3px;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 2px;
+  background: transparent;
 }
 
 .command-pill__name {
@@ -125,29 +121,17 @@ body {
   text-overflow: ellipsis;
 }
 
-/* Dot visible by default, action hidden */
 .command-pill__action-btn {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
+  width: 20px;
+  height: 20px;
   cursor: pointer;
 }
 
-/* On hover: hide dot, show action */
-.command-pill:hover .command-pill__dot {
-  display: none;
-}
-
-.command-pill:hover .command-pill__action-btn {
-  display: flex;
-}
-
-.command-pill__indicator:hover {
-  background: rgba(205, 214, 244, 0.1);
-}
-
 .command-launcher-trigger {
-  display: inline-flex;
+  /* display: inline-flex;
   min-height: 20px;
   align-items: center;
   gap: 5px;
@@ -158,7 +142,7 @@ body {
   background: color-mix(in srgb, var(--shell-surface-strong) 55%, transparent);
   color: var(--shell-fg);
   font-size: 11px;
-  cursor: pointer;
+  cursor: pointer; */
 }
 
 .command-launcher-trigger:hover {
@@ -724,6 +708,14 @@ select {
 .settings__row-name {
   font-weight: 600;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings__row-autostart {
+  flex-shrink: 0;
+  margin-top: 0;
 }
 
 .settings__row-cmd {
