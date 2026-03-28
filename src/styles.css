@@ -603,6 +603,12 @@ select {
   border-right: 1px solid var(--shell-border);
   padding: 8px 0;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings__sidebar-nav {
+  flex: 1;
 }
 
 .settings__nav-item {
@@ -812,22 +818,17 @@ select {
   font-size: 13px;
 }
 
-/* Actions */
-.settings__actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
-
 .settings__save {
-  padding: 7px 18px;
+  margin: 8px;
+  padding: 7px 12px;
   border: none;
   border-radius: 8px;
   background: var(--shell-accent);
   color: var(--shell-bg);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  width: calc(100% - 16px);
 }
 
 .settings__save:hover {
@@ -889,6 +890,86 @@ select {
 .settings__import-btn:hover {
   border-color: var(--shell-accent);
   color: var(--shell-fg);
+}
+
+/* --- Icon Picker --- */
+
+.icon-picker__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--shell-border);
+  border-radius: 6px;
+  background: var(--shell-surface-strong);
+  color: var(--shell-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.icon-picker__trigger:hover {
+  color: var(--shell-fg);
+  border-color: var(--shell-accent);
+}
+
+.icon-picker__dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 60;
+  width: 260px;
+  max-height: 280px;
+  margin-top: 4px;
+  border: 1px solid;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.icon-picker__search {
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid;
+  background: transparent;
+  color: var(--shell-fg);
+  font-size: 12px;
+  outline: none;
+}
+
+.icon-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.icon-picker__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--shell-fg);
+  cursor: pointer;
+}
+
+.icon-picker__item:hover {
+  background: rgba(205, 214, 244, 0.1);
+}
+
+.icon-picker__empty {
+  grid-column: 1 / -1;
+  padding: 12px;
+  text-align: center;
+  color: var(--shell-muted);
+  font-size: 12px;
 }
 
 @media (max-width: 640px) {

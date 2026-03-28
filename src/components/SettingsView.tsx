@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import * as LucideIcons from "lucide-react";
 import { TerminalSquare, Trash2, Plus, X, Check } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -8,11 +9,25 @@ import type { MakiConfig, ProcessConfig } from "../types";
 
 type SettingsSection = "commands" | "theme";
 
+// Build icon name list once (filter out Icon-suffixed duplicates and non-components)
+const ICON_NAMES: string[] = Object.keys(LucideIcons).filter(
+  (k) => /^[A-Z]/.test(k) && !k.endsWith("Icon") && k !== "default" && k !== "createLucideIcon"
+);
+
+function getLucideIcon(name: string): React.ComponentType<{ size?: number; className?: string }> {
+  const icon = (LucideIcons as Record<string, unknown>)[name];
+  if (typeof icon === "function" || (icon && typeof (icon as { render?: unknown }).render === "function")) {
+    return icon as React.ComponentType<{ size?: number; className?: string }>;
+  }
+  return TerminalSquare;
+}
+
 interface SettingsCommand {
   id: string;
   name: string;
   cmd: string;
   autostart: boolean;
+  icon?: string;
 }
 
 interface SettingsViewProps {
@@ -21,6 +36,97 @@ interface SettingsViewProps {
   theme: Theme;
   onSave: (updates: { processes: ProcessConfig[]; theme?: string }) => void;
   onClose: () => void;
+}
+
+/* ── Icon Picker ── */
+
+function IconPicker({
+  currentIcon,
+  theme,
+  onSelect,
+}: {
+  currentIcon: string;
+  theme: Theme;
+  onSelect: (name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase();
+    if (!q) return ICON_NAMES.slice(0, 50);
+    return ICON_NAMES.filter((n) => n.toLowerCase().includes(q)).slice(0, 50);
+  }, [query]);
+
+  useEffect(() => {
+    if (open) {
+      requestAnimationFrame(() => inputRef.current?.focus());
+    } else {
+      setQuery("");
+    }
+  }, [open]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const CurrentIcon = getLucideIcon(currentIcon);
+
+  return (
+    <div ref={containerRef} className="icon-picker" style={{ position: "relative" }}>
+      <button
+        className="icon-picker__trigger"
+        onClick={() => setOpen(!open)}
+        title="Change icon"
+      >
+        <CurrentIcon size={16} />
+      </button>
+      {open && (
+        <div className="icon-picker__dropdown" style={{ borderColor: theme.border, background: theme.tabBarBg }}>
+          <input
+            ref={inputRef}
+            className="icon-picker__search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search icons..."
+            style={{ borderColor: theme.border }}
+          />
+          <div className="icon-picker__grid">
+            {filtered.map((name) => {
+              const Icon = getLucideIcon(name);
+              return (
+                <button
+                  key={name}
+                  className={`icon-picker__item ${name === currentIcon ? "is-active" : ""}`}
+                  onClick={() => {
+                    onSelect(name);
+                    setOpen(false);
+                  }}
+                  title={name}
+                  style={name === currentIcon ? { background: theme.accent, color: theme.bg } : undefined}
+                >
+                  <Icon size={16} />
+                </button>
+              );
+            })}
+            {filtered.length === 0 && (
+              <span className="icon-picker__empty">No icons match</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 let nextCommandId = 0;
@@ -111,17 +217,22 @@ export function SettingsView({
       <div className="settings__body">
         {/* Sidebar */}
         <nav className="settings__sidebar">
-          <button
-            className={`settings__nav-item ${section === "commands" ? "is-active" : ""}`}
-            onClick={() => setSection("commands")}
-          >
-            Commands
-          </button>
-          <button
-            className={`settings__nav-item ${section === "theme" ? "is-active" : ""}`}
-            onClick={() => setSection("theme")}
-          >
-            Theme
+          <div className="settings__sidebar-nav">
+            <button
+              className={`settings__nav-item ${section === "commands" ? "is-active" : ""}`}
+              onClick={() => setSection("commands")}
+            >
+              Commands
+            </button>
+            <button
+              className={`settings__nav-item ${section === "theme" ? "is-active" : ""}`}
+              onClick={() => setSection("theme")}
+            >
+              Theme
+            </button>
+          </div>
+          <button className="settings__save" onClick={handleSave}>
+            Save &amp; restart
           </button>
         </nav>
 
@@ -150,11 +261,6 @@ export function SettingsView({
               />
             )}
 
-            <div className="settings__actions">
-              <button className="settings__save" onClick={handleSave}>
-                Save &amp; restart
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -197,6 +303,11 @@ function CommandsSection({
               /* Expanded / edit mode */
               <div className="settings__row-expanded">
                 <div className="settings__row-inputs">
+                  <IconPicker
+                    currentIcon={cmd.icon || "TerminalSquare"}
+                    theme={theme}
+                    onSelect={(icon) => onUpdate(cmd.id, { icon })}
+                  />
                   <input
                     className="settings__input settings__input--name"
                     value={cmd.name}
@@ -232,7 +343,7 @@ function CommandsSection({
             ) : (
               /* Collapsed / list mode */
               <div className="settings__row-collapsed" onClick={() => onToggle(cmd.id)}>
-                <TerminalSquare size={16} className="settings__row-icon" />
+                {(() => { const Icon = getLucideIcon(cmd.icon || "TerminalSquare"); return <Icon size={16} className="settings__row-icon" />; })()}
                 <div className="settings__row-info">
                   <span className="settings__row-name">
                     {cmd.name || <em style={{ color: theme.stopped }}>Untitled</em>}
