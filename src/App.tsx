@@ -9,6 +9,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ConfigWizardView } from "./components/ConfigWizardView";
 import { ProjectPickerView } from "./components/ProjectPickerView";
+import { SettingsView } from "./components/SettingsView";
 import { StatusBar } from "./components/StatusBar";
 import { TabBar, CommandBar, CommandLauncher } from "./components/TabBar";
 import { TerminalView } from "./components/TerminalView";
@@ -116,6 +117,7 @@ export default function App() {
   const [activeTabId, setActiveTabId] = useState("");
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [commandLauncherOpen, setCommandLauncherOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
   const theme = getTheme(workspaceConfig?.config.theme);
 
@@ -295,6 +297,35 @@ export default function App() {
     void session.openFolder();
   }, [session]);
 
+  const handleSettingsSave = useCallback(
+    async (updates: { processes: import("./types").ProcessConfig[]; theme?: string }) => {
+      if (!workspaceConfig) return;
+
+      const updatedConfig: MakiConfig = {
+        ...workspaceConfig.config,
+        processes: updates.processes,
+        theme: updates.theme,
+      };
+
+      try {
+        await invoke("save_settings", {
+          projectPath: workspaceConfig.projectRoot,
+          config: updatedConfig,
+        });
+
+        // Reload: update config state, recreate tabs from new config
+        const nextTabs = createTabsFromConfig(updatedConfig, projectRoot);
+        setWorkspaceConfig({ projectRoot, config: updatedConfig });
+        setTabs(nextTabs);
+        setActiveTabId(nextTabs[0]?.id ?? "");
+        setSettingsOpen(false);
+      } catch (error) {
+        console.error("Failed to save settings:", error);
+      }
+    },
+    [workspaceConfig, projectRoot]
+  );
+
   const handleSessionCreated = useCallback((tabId: string, sessionId: number) => {
     setTabs((prev) =>
       prev.map((tab) => (tab.id === tabId ? { ...tab, sessionId, status: "running" } : tab))
@@ -350,6 +381,11 @@ export default function App() {
       if (event.metaKey && event.key.toLowerCase() === "p") {
         event.preventDefault();
         setCommandLauncherOpen(true);
+      }
+
+      if (event.metaKey && event.key === ",") {
+        event.preventDefault();
+        setSettingsOpen(true);
       }
 
       if (event.metaKey && event.key >= "1" && event.key <= "9") {
@@ -546,7 +582,7 @@ export default function App() {
 
       <CommandLauncher
         open={commandLauncherOpen}
-        commands={tabs.filter((tab) => tab.type === "process" && !tab.autostart)}
+        commands={tabs.filter((tab) => tab.type === "process")}
         theme={theme}
         onClose={() => setCommandLauncherOpen(false)}
         onRunCommand={handleRunCommand}
@@ -559,6 +595,16 @@ export default function App() {
         theme={theme}
         availableUpdate={availableUpdate}
       />
+
+      {settingsOpen && workspaceConfig && (
+        <SettingsView
+          config={workspaceConfig.config}
+          currentTheme={workspaceConfig.config.theme || "dark"}
+          theme={theme}
+          onSave={handleSettingsSave}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </div>
   );
 }

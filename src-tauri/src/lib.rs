@@ -114,6 +114,7 @@ pub fn run() {
             config::open_folder_dialog,
             config::generate_config_preview,
             config::save_config,
+            config::save_settings,
             git::get_git_status,
             workspace_state::load_app_state,
             workspace_state::save_app_state,

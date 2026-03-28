@@ -289,7 +289,7 @@ describe("CommandLauncher", () => {
 
   it("filters commands by search query", () => {
     renderLauncher();
-    const input = screen.getByPlaceholderText("Search one-off commands...");
+    const input = screen.getByPlaceholderText("Search commands...");
     fireEvent.change(input, { target: { value: "story" } });
     expect(screen.getByText("storybook")).toBeInTheDocument();
     expect(screen.queryByText("web server")).not.toBeInTheDocument();
@@ -298,17 +298,9 @@ describe("CommandLauncher", () => {
 
   it("shows empty state when no commands match", () => {
     renderLauncher();
-    const input = screen.getByPlaceholderText("Search one-off commands...");
+    const input = screen.getByPlaceholderText("Search commands...");
     fireEvent.change(input, { target: { value: "zzzzz" } });
     expect(screen.getByText("No matching command")).toBeInTheDocument();
-  });
-
-  it("shows 'Open' for running commands, 'Run' for stopped", () => {
-    renderLauncher();
-    const openLabels = screen.getAllByText("Open");
-    const runLabels = screen.getAllByText("Run");
-    expect(openLabels).toHaveLength(2); // web server + storybook are running
-    expect(runLabels).toHaveLength(1); // test watch is stopped
   });
 
   it("calls onRunCommand and onClose when a command is clicked", () => {

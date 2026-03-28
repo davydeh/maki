@@ -486,13 +486,12 @@ export function CommandLauncher({
       <div
         className="command-launcher__panel"
         style={{
-          borderColor: theme.border,
-          background: theme.tabBarBg,
+          background: theme.activeTabBg,
           color: theme.fg,
         }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="command-launcher__input-wrap" style={{ borderColor: theme.border }}>
+        <div className="command-launcher__input-wrap">
           <Search size={14} />
           <input
             ref={inputRef}
@@ -502,7 +501,7 @@ export function CommandLauncher({
               setQuery(event.target.value);
               setActiveIndex(0);
             }}
-            placeholder="Search one-off commands..."
+            placeholder="Search commands..."
           />
           <span className="command-launcher__hint">Esc</span>
         </div>
@@ -513,14 +512,14 @@ export function CommandLauncher({
           )}
 
           {filtered.map((command, index) => {
-            const isRunning = command.status === "running";
+            const isActive = index === activeIndex;
             return (
               <button
                 key={command.id}
-                className={`command-launcher__item ${index === activeIndex ? "is-active" : ""}`}
+                className={`command-launcher__item ${isActive ? "is-active" : ""}`}
                 style={{
-                  borderColor: index === activeIndex ? theme.accent : "transparent",
-                  color: index === activeIndex ? theme.fg : theme.tabFg,
+                  background: isActive ? theme.accent : "transparent",
+                  color: isActive ? "#fff" : theme.fg,
                 }}
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => {
@@ -540,7 +539,6 @@ export function CommandLauncher({
                   }}
                 />
                 <span className="command-launcher__name">{command.name}</span>
-                <span className="command-launcher__run">{isRunning ? "Open" : "Run"}</span>
               </button>
             );
           })}

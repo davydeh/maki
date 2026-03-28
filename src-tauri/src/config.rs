@@ -174,6 +174,18 @@ pub fn generate_config_preview(draft: ConfigDraft) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn save_settings(project_path: String, config: Config) -> Result<String, String> {
+    let project_path = canonicalize_existing_project_directory(&project_path)?;
+    let yaml = serialize_config(&config)?;
+    let config_path = project_path.join("maki.yaml");
+
+    fs::write(&config_path, &yaml)
+        .map_err(|err| format!("Writing config {}: {err}", config_path.display()))?;
+
+    Ok(config_path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
 pub fn save_config(request: ConfigSaveRequest) -> Result<String, String> {
     let project_path = canonicalize_existing_project_directory(&request.project_path)?;
     let yaml = generate_config_preview(request.draft)?;
