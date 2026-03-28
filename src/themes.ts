@@ -146,3 +146,70 @@ export const themes: Record<string, Theme> = {
 export function getTheme(name?: string): Theme {
   return themes[name || "dark"] || themes.dark;
 }
+
+/** Convert an imported theme (from iTerm2/Ghostty) into a full Theme object */
+export function importedThemeToTheme(imported: {
+  name: string;
+  background: string;
+  foreground: string;
+  cursor: string;
+  black: string;
+  red: string;
+  green: string;
+  yellow: string;
+  blue: string;
+  magenta: string;
+  cyan: string;
+  white: string;
+  bright_black: string;
+  bright_red: string;
+  bright_green: string;
+  bright_yellow: string;
+  bright_blue: string;
+  bright_magenta: string;
+  bright_cyan: string;
+  bright_white: string;
+}): Theme {
+  const bg = imported.background || "#1e1e2e";
+  const fg = imported.foreground || "#cdd6f4";
+  return {
+    name: imported.name,
+    bg,
+    fg,
+    tabBarBg: bg,
+    inactiveTabBg: bg,
+    activeTabBg: imported.bright_black || "#313244",
+    activeTabFg: fg,
+    tabFg: imported.bright_black || "#6c7086",
+    statusBarBg: bg,
+    statusBarFg: imported.bright_black || "#6c7086",
+    running: imported.green,
+    errored: imported.red,
+    stopped: imported.bright_black || "#6c7086",
+    shell: imported.blue,
+    accent: imported.blue,
+    border: imported.bright_black || "#313244",
+    terminal: {
+      background: bg,
+      foreground: fg,
+      cursor: imported.cursor,
+      selectionBackground: imported.bright_black || "#45475a",
+      black: imported.black,
+      red: imported.red,
+      green: imported.green,
+      yellow: imported.yellow,
+      blue: imported.blue,
+      magenta: imported.magenta,
+      cyan: imported.cyan,
+      white: imported.white,
+      brightBlack: imported.bright_black,
+      brightRed: imported.bright_red,
+      brightGreen: imported.bright_green,
+      brightYellow: imported.bright_yellow,
+      brightBlue: imported.bright_blue,
+      brightMagenta: imported.bright_magenta,
+      brightCyan: imported.bright_cyan,
+      brightWhite: imported.bright_white,
+    },
+  };
+}

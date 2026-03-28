@@ -5,6 +5,7 @@ mod config;
 mod git;
 mod pty;
 mod windows;
+mod theme_import;
 mod workspace_state;
 
 #[tauri::command]
@@ -115,6 +116,8 @@ pub fn run() {
             config::generate_config_preview,
             config::save_config,
             config::save_settings,
+            theme_import::import_iterm2_theme,
+            theme_import::import_ghostty_theme,
             git::get_git_status,
             workspace_state::load_app_state,
             workspace_state::save_app_state,

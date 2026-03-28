@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { TerminalSquare, Trash2, Plus, X, Check } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import type { Theme } from "../themes";
-import { themes } from "../themes";
+import { themes, importedThemeToTheme } from "../themes";
 import type { MakiConfig, ProcessConfig } from "../types";
 
 type SettingsSection = "commands" | "theme";
@@ -45,6 +47,7 @@ export function SettingsView({
   );
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedTheme, setSelectedTheme] = useState(currentTheme);
+  const [customThemes, setCustomThemes] = useState<Record<string, Theme>>({});
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -85,7 +88,15 @@ export function SettingsView({
     onSave({ processes, theme: selectedTheme });
   };
 
-  const themeList = Object.entries(themes);
+  const handleImportTheme = (imported: Theme, name: string) => {
+    setCustomThemes((prev) => ({ ...prev, [name]: imported }));
+    setSelectedTheme(name);
+  };
+
+  const themeList: [string, Theme][] = [
+    ...Object.entries(themes),
+    ...Object.entries(customThemes),
+  ];
 
   return (
     <div className="settings">
@@ -135,6 +146,7 @@ export function SettingsView({
                 selectedTheme={selectedTheme}
                 theme={theme}
                 onSelectTheme={setSelectedTheme}
+                onImportTheme={handleImportTheme}
               />
             )}
 
@@ -260,17 +272,63 @@ function CommandsSection({
 
 /* ── Theme Section ── */
 
+interface ImportedThemeData {
+  name: string;
+  background: string;
+  foreground: string;
+  cursor: string;
+  black: string;
+  red: string;
+  green: string;
+  yellow: string;
+  blue: string;
+  magenta: string;
+  cyan: string;
+  white: string;
+  bright_black: string;
+  bright_red: string;
+  bright_green: string;
+  bright_yellow: string;
+  bright_blue: string;
+  bright_magenta: string;
+  bright_cyan: string;
+  bright_white: string;
+}
+
 function ThemeSection({
   themeList,
   selectedTheme,
   theme,
   onSelectTheme,
+  onImportTheme,
 }: {
   themeList: [string, Theme][];
   selectedTheme: string;
   theme: Theme;
   onSelectTheme: (name: string) => void;
+  onImportTheme: (imported: Theme, name: string) => void;
 }) {
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const handleImport = async (format: "iterm2" | "ghostty") => {
+    setImportError(null);
+    const filters = format === "iterm2"
+      ? [{ name: "iTerm2 Color Scheme", extensions: ["itermcolors"] }]
+      : [{ name: "Ghostty Theme", extensions: ["conf", "txt", "*"] }];
+
+    const filePath = await open({ filters, multiple: false });
+    if (!filePath) return;
+
+    try {
+      const command = format === "iterm2" ? "import_iterm2_theme" : "import_ghostty_theme";
+      const imported = await invoke<ImportedThemeData>(command, { path: filePath });
+      const newTheme = importedThemeToTheme(imported);
+      onImportTheme(newTheme, imported.name);
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   return (
     <>
       <div className="settings__section-header">
@@ -301,9 +359,19 @@ function ThemeSection({
         ))}
       </div>
 
+      {importError && (
+        <div style={{ color: theme.errored, fontSize: "12px", marginTop: "8px" }}>
+          {importError}
+        </div>
+      )}
+
       <div className="settings__import-buttons">
-        <button className="settings__import-btn">Import from iTerm2...</button>
-        <button className="settings__import-btn">Import from Ghostty...</button>
+        <button className="settings__import-btn" onClick={() => handleImport("iterm2")}>
+          Import from iTerm2...
+        </button>
+        <button className="settings__import-btn" onClick={() => handleImport("ghostty")}>
+          Import from Ghostty...
+        </button>
       </div>
     </>
   );
