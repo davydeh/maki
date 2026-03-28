@@ -52,7 +52,7 @@ export function TerminalView({
       fontSize: 13,
       lineHeight: 1.2,
       cursorBlink: true,
-      scrollback: 10000,
+      scrollback: 5000,
       allowProposedApi: true,
     });
 
