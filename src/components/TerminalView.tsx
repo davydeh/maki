@@ -276,7 +276,7 @@ export function TerminalView({
             // Canvas fallback — no action needed
           }
         }
-        term.focus();
+        if (typeof term.focus === "function") term.focus();
       });
     } else {
       // Release GPU context for inactive tabs
