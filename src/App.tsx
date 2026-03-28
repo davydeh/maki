@@ -13,6 +13,7 @@ import { StatusBar } from "./components/StatusBar";
 import { TabBar, CommandBar, CommandLauncher } from "./components/TabBar";
 import { TerminalView } from "./components/TerminalView";
 import { useWorkspaceSession } from "./hooks/useWorkspaceSession";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 import { getTheme, type Theme } from "./themes";
 import type { GitStatus, LoadedWorkspaceConfig, MakiConfig, Tab } from "./types";
 
@@ -115,6 +116,7 @@ export default function App() {
   const [activeTabId, setActiveTabId] = useState("");
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [commandLauncherOpen, setCommandLauncherOpen] = useState(false);
+  const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
   const theme = getTheme(workspaceConfig?.config.theme);
 
   useEffect(() => {
@@ -184,6 +186,21 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, [projectRoot, session.screen]);
+
+  // Check for updates once when workspace loads
+  useEffect(() => {
+    if (session.screen !== "workspace") return;
+
+    check()
+      .then((update) => {
+        if (update?.available) {
+          setAvailableUpdate(update);
+        }
+      })
+      .catch(() => {
+        // Silent failure — update check is best-effort
+      });
+  }, [session.screen]);
 
   const handleTabClick = useCallback((id: string) => setActiveTabId(id), []);
 
@@ -536,6 +553,7 @@ export default function App() {
         gitStatus={gitStatus}
         projectPath={projectRoot}
         theme={theme}
+        availableUpdate={availableUpdate}
       />
     </div>
   );
