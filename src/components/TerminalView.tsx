@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -41,6 +41,29 @@ export function TerminalView({
   const fitRef = useRef<FitAddon | null>(null);
   const webglRef = useRef<WebglAddon | null>(null);
   const sessionIdRef = useRef<number | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [debugInfo, setDebugInfo] = useState("");
+  useEffect(() => {
+    setHasLoaded(true);
+  }, [setHasLoaded]);
+
+  // Debug helper — logs fit info visually
+  const debugFit = (label: string) => {
+    const container = containerRef.current;
+    const term = termRef.current;
+    const fit = fitRef.current;
+    const dims = fit?.proposeDimensions();
+    const info = [
+      label,
+      `container: ${container?.clientWidth}x${container?.clientHeight}`,
+      `display: ${container?.style.display}`,
+      `cols: ${term?.cols}`,
+      `proposed: ${dims?.cols}x${dims?.rows}`,
+      `webgl: ${webglRef.current ? "yes" : "no"}`,
+    ].join(" | ");
+    setDebugInfo(info);
+    console.log(`[FIT] ${info}`);
+  };
 
   // Initialize terminal and PTY
   useEffect(() => {
@@ -287,13 +310,16 @@ export function TerminalView({
             // Canvas fallback — no action needed
           }
         }
+        debugFit("active-pre-fit");
         fitRef.current?.fit();
+        debugFit("active-post-fit");
         if (typeof term.focus === "function") term.focus();
 
-        // Second fit after WebGL texture atlas initializes — the first fit
-        // may use stale cell metrics if WebGL hasn't fully rendered yet
+        // Second fit after WebGL texture atlas initializes
         requestAnimationFrame(() => {
+          debugFit("active-2nd-raf-pre");
           fitRef.current?.fit();
+          debugFit("active-2nd-raf-post");
         });
       });
     } else {
@@ -313,6 +339,7 @@ export function TerminalView({
 
     if (typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver(() => {
+        debugFit("resize-observer");
         fitRef.current?.fit();
       });
       observer.observe(container);
@@ -330,16 +357,32 @@ export function TerminalView({
   }, [active]);
 
   return (
-    <div
-      ref={containerRef}
-      onClick={() => termRef.current?.focus()}
-      style={{
-        display: active ? "block" : "none",
-        width: "100%",
-        height: "100%",
-        padding: "0 4px",
-        backgroundColor: theme.terminal.background,
-      }}
-    />
+    <div style={{ display: active ? "flex" : "none", flexDirection: "column", width: "100%", height: "100%" }}>
+      {/* DEBUG BAR — remove after fixing */}
+      {debugInfo && (
+        <div style={{
+          padding: "2px 8px",
+          fontSize: "10px",
+          fontFamily: "monospace",
+          background: "#f38ba8",
+          color: "#1e1e2e",
+          flexShrink: 0,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+        }}>
+          {debugInfo}
+        </div>
+      )}
+      <div
+        ref={containerRef}
+        onClick={() => termRef.current?.focus()}
+        style={{
+          flex: 1,
+          width: "100%",
+          padding: "0 4px",
+          backgroundColor: theme.terminal.background,
+        }}
+      />
+    </div>
   );
 }
