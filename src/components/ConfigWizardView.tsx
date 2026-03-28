@@ -1,4 +1,5 @@
-import { Plus, FolderOpen } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Plus, FolderOpen, TerminalSquare, Check, RefreshCw } from "lucide-react";
 import type { ProjectInspection, WizardDraft, WizardCommandUpdate } from "../types";
 
 interface ConfigWizardViewProps {
@@ -17,31 +18,29 @@ interface ConfigWizardViewProps {
   onOpenFolder: () => void | Promise<void>;
 }
 
-function hasInvalidEnabledCommands(draft: WizardDraft): boolean {
-  return draft.commands.some(
-    (command) =>
-      command.enabled &&
-      (command.name.trim().length === 0 || command.cmd.trim().length === 0)
-  );
-}
-
 export function ConfigWizardView({
   project,
   restoreError,
   wizardDraft,
-  wizardPreview,
   wizardPreviewError,
-  wizardPreviewPending,
-  wizardPreviewDirty = false,
   wizardSavePending,
   onAddCommand,
   onUpdateCommand,
-  onRefreshPreview,
   onSave,
   onOpenFolder,
 }: ConfigWizardViewProps) {
-  const enabledCommands = wizardDraft.commands.filter((c) => c.enabled).length;
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const prevCountRef = useRef(wizardDraft.commands.length);
   const canSave = !wizardSavePending;
+
+  // Auto-expand newly added commands
+  useEffect(() => {
+    const count = wizardDraft.commands.length;
+    if (count > prevCountRef.current && count > 0) {
+      setExpandedId(wizardDraft.commands[count - 1].id);
+    }
+    prevCountRef.current = count;
+  }, [wizardDraft.commands]);
 
   return (
     <div className="shell-screen">
@@ -71,14 +70,8 @@ export function ConfigWizardView({
         )}
 
         {/* Commands section */}
-        <section style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
+        <section>
+          <div className="settings__section-header">
             <span
               style={{
                 fontSize: "12px",
@@ -88,209 +81,146 @@ export function ConfigWizardView({
               }}
             >
               Commands
-              {enabledCommands > 0 && (
-                <span style={{ fontWeight: 400, marginLeft: "8px" }}>
-                  {enabledCommands} enabled
-                </span>
-              )}
             </span>
             <button
               type="button"
+              className="settings__add-btn"
               onClick={() => { void onAddCommand(); }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-                padding: "4px 10px",
-                border: "1px solid var(--shell-border)",
-                borderRadius: "6px",
-                background: "var(--shell-surface-strong)",
-                color: "var(--shell-fg)",
-                fontSize: "12px",
-                cursor: "pointer",
-              }}
             >
-              <Plus size={13} />
-              Add command
+              <Plus size={13} /> Add command
             </button>
           </div>
 
-          {wizardDraft.commands.length === 0 && (
-            <div
-              style={{
-                padding: "12px",
-                fontSize: "13px",
-                color: "var(--shell-muted)",
-                border: "1px solid var(--shell-border)",
-                borderRadius: "8px",
-                background: "var(--shell-surface-strong)",
-              }}
-            >
-              No commands yet. Add one to continue.
-            </div>
-          )}
-
-
-          {wizardDraft.commands.map((command) => (
-            <div
-              key={command.id}
-              data-testid={`wizard-command-${command.id}`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                padding: "8px 10px",
-                border: "1px solid var(--shell-border)",
-                borderRadius: "8px",
-                background: "var(--shell-surface-strong)",
-                opacity: command.enabled ? 1 : 0.5,
-              }}
-            >
-              {/* Rounded checkbox */}
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  cursor: "pointer",
-                  flexShrink: 0,
-                }}
+          <div className="settings__list">
+            {wizardDraft.commands.map((command) => (
+              <div
+                key={command.id}
+                data-testid={`wizard-command-${command.id}`}
+                className="settings__row"
+                style={{ opacity: command.enabled ? 1 : 0.4 }}
               >
-                <input
-                  type="checkbox"
-                  aria-label="Enable"
-                  checked={command.enabled}
-                  onChange={(e) => {
-                    onUpdateCommand(command.id, { enabled: e.target.checked });
-                  }}
-                  style={{ display: "none" }}
-                />
-                <span
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "18px",
-                    height: "18px",
-                    borderRadius: "50%",
-                    border: command.enabled
-                      ? "none"
-                      : "2px solid var(--shell-muted)",
-                    background: command.enabled
-                      ? "var(--shell-accent)"
-                      : "transparent",
-                    transition: "all 100ms ease",
-                    flexShrink: 0,
-                  }}
-                >
-                  {command.enabled && (
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                      <path
-                        d="M2 5L4.5 7.5L8 3"
-                        stroke="white"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                {expandedId === command.id ? (
+                  /* Expanded / edit mode */
+                  <div className="settings__row-expanded">
+                    <div className="settings__row-inputs">
+                      {/* Enable checkbox */}
+                      <EnableCheckbox
+                        checked={command.enabled}
+                        onChange={(enabled) =>
+                          onUpdateCommand(command.id, { enabled })
+                        }
                       />
-                    </svg>
-                  )}
-                </span>
-              </label>
-
-              {/* Name input */}
-              <input
-                aria-label="Name"
-                value={command.name}
-                onChange={(e) => {
-                  onUpdateCommand(command.id, { name: e.target.value });
-                }}
-                placeholder="name"
-                style={{
-                  width: "100px",
-                  padding: "4px 8px",
-                  border: "1px solid var(--shell-border)",
-                  borderRadius: "4px",
-                  background: "var(--shell-surface)",
-                  color: "var(--shell-fg)",
-                  fontSize: "12px",
-                  flexShrink: 0,
-                }}
-              />
-
-              {/* Command input */}
-              <input
-                aria-label="Command"
-                value={command.cmd}
-                onChange={(e) => {
-                  onUpdateCommand(command.id, { cmd: e.target.value });
-                }}
-                placeholder="command"
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  padding: "4px 8px",
-                  border: "1px solid var(--shell-border)",
-                  borderRadius: "4px",
-                  background: "var(--shell-surface)",
-                  color: "var(--shell-fg)",
-                  fontSize: "12px",
-                }}
-              />
-
-              {/* Autostart toggle */}
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                  cursor: "pointer",
-                  flexShrink: 0,
-                  fontSize: "11px",
-                  color: "var(--shell-muted)",
-                }}
-                title="Autostart this command on project open"
-              >
-                <input
-                  type="checkbox"
-                  aria-label="Autostart"
-                  checked={command.autostart}
-                  onChange={(e) => {
-                    onUpdateCommand(command.id, { autostart: e.target.checked });
-                  }}
-                  style={{ display: "none" }}
-                />
-                <span
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "14px",
-                    height: "14px",
-                    borderRadius: "50%",
-                    border: command.autostart
-                      ? "none"
-                      : "1.5px solid var(--shell-muted)",
-                    background: command.autostart
-                      ? "#a6e3a1"
-                      : "transparent",
-                    transition: "all 100ms ease",
-                  }}
-                >
-                  {command.autostart && (
-                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
-                      <path
-                        d="M2 5L4.5 7.5L8 3"
-                        stroke="#11111b"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                      <input
+                        className="settings__input settings__input--name"
+                        aria-label="Name"
+                        value={command.name}
+                        onChange={(e) =>
+                          onUpdateCommand(command.id, { name: e.target.value })
+                        }
+                        placeholder="Name"
+                        autoFocus
                       />
-                    </svg>
-                  )}
-                </span>
-                <span>auto</span>
-              </label>
-            </div>
-          ))}
+                      <input
+                        className="settings__input settings__input--cmd"
+                        aria-label="Command"
+                        value={command.cmd}
+                        onChange={(e) =>
+                          onUpdateCommand(command.id, { cmd: e.target.value })
+                        }
+                        placeholder="Command (e.g. npm run dev)"
+                      />
+                    </div>
+                    <div className="settings__row-meta">
+                      <button
+                        className="settings__autostart-toggle"
+                        style={{ paddingLeft: "40px" }}
+                        onClick={() =>
+                          onUpdateCommand(command.id, {
+                            autostart: !command.autostart,
+                          })
+                        }
+                      >
+                        <span
+                          className={`settings__checkbox ${command.autostart ? "is-checked" : ""}`}
+                          style={{
+                            borderColor: command.autostart
+                              ? "var(--shell-accent)"
+                              : "var(--shell-muted)",
+                            background: command.autostart
+                              ? "var(--shell-accent)"
+                              : "transparent",
+                          }}
+                        >
+                          {command.autostart && (
+                            <Check size={10} style={{ color: "var(--shell-bg)" }} />
+                          )}
+                        </span>
+                        <span
+                          style={{
+                            color: command.autostart
+                              ? "var(--shell-accent)"
+                              : "var(--shell-muted)",
+                            fontSize: "13px",
+                          }}
+                        >
+                          Start automatically
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Collapsed / list mode */
+                  <div
+                    className="settings__row-collapsed"
+                    onClick={() =>
+                      setExpandedId(expandedId === command.id ? null : command.id)
+                    }
+                  >
+                    <EnableCheckbox
+                      checked={command.enabled}
+                      onChange={(enabled) => {
+                        onUpdateCommand(command.id, { enabled });
+                      }}
+                    />
+                    <TerminalSquare size={16} className="settings__row-icon" />
+                    <div className="settings__row-info">
+                      <div className="settings__row-top">
+                        <span className="settings__row-name">
+                          {command.name || (
+                            <em style={{ color: "var(--shell-muted)" }}>Untitled</em>
+                          )}
+                        </span>
+                        {command.cmd && (
+                          <>
+                            <span style={{ color: "var(--shell-muted)" }}>·</span>
+                            <span className="settings__row-cmd">{command.cmd}</span>
+                          </>
+                        )}
+                      </div>
+                      {command.autostart && (
+                        <span
+                          title="This command starts automatically"
+                          style={{ display: "flex", marginTop: "2px" }}
+                        >
+                          <RefreshCw
+                            strokeWidth={2}
+                            size={12}
+                            style={{ color: "var(--shell-accent)" }}
+                          />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {wizardDraft.commands.length === 0 && (
+              <div className="settings__empty">
+                No commands yet. Click "+ Add command" to create one.
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Preview error */}
@@ -307,7 +237,6 @@ export function ConfigWizardView({
             alignItems: "center",
             gap: "8px",
             paddingTop: "4px",
-            borderTop: "1px solid var(--shell-border)",
           }}
         >
           <button
@@ -353,5 +282,49 @@ export function ConfigWizardView({
         </div>
       </div>
     </div>
+  );
+}
+
+/* ── Enable checkbox (round, with check SVG) ── */
+
+function EnableCheckbox({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label
+      style={{ display: "flex", alignItems: "center", cursor: "pointer", flexShrink: 0 }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <input
+        type="checkbox"
+        aria-label="Enable"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        style={{ display: "none" }}
+      />
+      <span
+        className={`settings__checkbox ${checked ? "is-checked" : ""}`}
+        style={{
+          borderColor: checked ? "var(--shell-accent)" : "var(--shell-muted)",
+          background: checked ? "var(--shell-accent)" : "transparent",
+        }}
+      >
+        {checked && (
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path
+              d="M2 5L4.5 7.5L8 3"
+              stroke="white"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </span>
+    </label>
   );
 }

@@ -148,10 +148,11 @@ describe("ConfigWizardView", () => {
 
     const firstCommand = await screen.findByTestId("wizard-command-detected-0");
 
+    // Click the collapsed row content to expand
+    fireEvent.click(within(firstCommand).getByText("dev"));
+
     expect(within(firstCommand).getByLabelText("Name")).toHaveValue("dev");
     expect(within(firstCommand).getByLabelText("Command")).toHaveValue("npm run dev");
-    expect(screen.getByDisplayValue("php artisan serve")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("python main.py")).toBeInTheDocument();
   });
 
   it("disables save when no commands are enabled", async () => {
@@ -230,6 +231,8 @@ describe("ConfigWizardView", () => {
     render(<SessionWizardHarness />);
 
     const firstCommand = await screen.findByTestId("wizard-command-detected-0");
+    // Click to expand, then edit
+    fireEvent.click(within(firstCommand).getByText("dev"));
     fireEvent.change(within(firstCommand).getByLabelText("Name"), {
       target: { value: "web" },
     });
