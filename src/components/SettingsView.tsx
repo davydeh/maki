@@ -99,6 +99,9 @@ function IconPicker({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search icons..."
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             style={{ borderColor: theme.border }}
           />
           <div className="icon-picker__grid">
@@ -363,11 +366,13 @@ function CommandsSection({
               <div className="settings__row-collapsed" onClick={() => onToggle(cmd.id)}>
                 {(() => { const Icon = getLucideIcon(cmd.icon || "TerminalSquare"); return <Icon size={16} className="settings__row-icon" />; })()}
 
-                <span className="settings__row-name" style={{ flexShrink: "0" }}>
-                  {cmd.name || <em style={{ color: theme.stopped }}>Untitled</em>}
-                </span>
+                <div className="settings__row-top">
+                  <span className="settings__row-name" style={{ flexShrink: "0" }}>
+                    {cmd.name || <em style={{ color: theme.stopped }}>Untitled</em>}
+                  </span>
 
-                <span className="settings__row-cmd">{cmd.cmd}</span>
+                  <span className="settings__row-cmd">{cmd.cmd}</span>
+                </div>
 
                 {cmd.autostart && (
                   <span className="settings__row-badge" style={{ color: theme.running }}>
@@ -376,7 +381,6 @@ function CommandsSection({
                   </span>
                 )}
 
-                <span style={{ flex: 1 }} />
                 <button
                   className="settings__delete-btn"
                   onClick={(e) => {

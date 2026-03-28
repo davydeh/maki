@@ -502,6 +502,9 @@ export function CommandLauncher({
               setActiveIndex(0);
             }}
             placeholder="Search commands..."
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
           />
           <span className="command-launcher__hint">Esc</span>
         </div>
