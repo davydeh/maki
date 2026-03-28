@@ -84,7 +84,8 @@ export function TerminalView({
     termRef.current = term;
     fitRef.current = fitAddon;
 
-    // Delay initial fit to ensure container has final layout dimensions
+    // Initial fit after open — single RAF is sufficient since useEffect
+    // runs after React commits DOM changes
     requestAnimationFrame(() => fitAddon.fit());
 
     // Listen for PTY output
@@ -313,6 +314,10 @@ export function TerminalView({
         fitRef.current?.fit();
       });
       observer.observe(container);
+      // Also observe parent — catches layout shifts from tab bar/command bar changes
+      if (container.parentElement) {
+        observer.observe(container.parentElement);
+      }
       return () => observer.disconnect();
     }
 
@@ -330,6 +335,7 @@ export function TerminalView({
         display: active ? "block" : "none",
         width: "100%",
         height: "100%",
+        padding: "0 4px",
         backgroundColor: theme.terminal.background,
       }}
     />
