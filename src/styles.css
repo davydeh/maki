@@ -12,6 +12,11 @@ body,
   overflow: hidden;
 }
 
+/* Hide xterm scrollbar to eliminate right-side gap */
+.xterm-viewport::-webkit-scrollbar {
+  width: 0;
+}
+
 :root {
   color-scheme: dark;
   --shell-bg: #1e1e2e;
