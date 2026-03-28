@@ -7,6 +7,7 @@ import {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ConfigWizardView } from "./components/ConfigWizardView";
 import { ProjectPickerView } from "./components/ProjectPickerView";
 import { StatusBar } from "./components/StatusBar";
@@ -201,6 +202,14 @@ export default function App() {
         // Silent failure — update check is best-effort
       });
   }, [session.screen]);
+
+  // Update window title to match active tab name
+  useEffect(() => {
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (!activeTab) return;
+    const title = activeTab.name || workspaceConfig?.config.name || "maki";
+    getCurrentWindow().setTitle(title).catch(() => {});
+  }, [activeTabId, tabs, workspaceConfig]);
 
   const handleTabClick = useCallback((id: string) => setActiveTabId(id), []);
 

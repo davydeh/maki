@@ -64,6 +64,22 @@ vi.mock("@xterm/addon-webgl", () => ({
   WebglAddon: MockWebglAddon,
 }));
 
+vi.mock("@xterm/addon-web-links", () => ({
+  WebLinksAddon: class { },
+}));
+
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({ setTitle: vi.fn().mockResolvedValue(undefined) }),
+}));
+
+vi.mock("@tauri-apps/plugin-updater", () => ({
+  check: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@tauri-apps/plugin-process", () => ({
+  relaunch: vi.fn(),
+}));
+
 const invokeMock = vi.mocked(invoke);
 const listenMock = vi.mocked(listen);
 

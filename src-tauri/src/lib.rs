@@ -77,6 +77,28 @@ pub fn run() {
                 let _ = app_handle.emit("menu-action", id);
             });
 
+            // Set window background color to match theme (#1e1e2e)
+            // so the transparent title bar blends seamlessly
+            #[cfg(target_os = "macos")]
+            {
+                use cocoa::appkit::{NSColor, NSWindow};
+                use cocoa::base::{id, nil};
+
+                if let Some(window) = app.get_webview_window("main") {
+                    let ns_window = window.ns_window().unwrap() as id;
+                    unsafe {
+                        let bg_color = NSColor::colorWithRed_green_blue_alpha_(
+                            nil,
+                            30.0 / 255.0,  // #1e
+                            30.0 / 255.0,  // #1e
+                            46.0 / 255.0,  // #2e
+                            1.0,
+                        );
+                        ns_window.setBackgroundColor_(bg_color);
+                    }
+                }
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| {
