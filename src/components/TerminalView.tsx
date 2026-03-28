@@ -304,10 +304,6 @@ export function TerminalView({
           });
         }
 
-        // Second fit after WebGL texture atlas initializes
-        requestAnimationFrame(() => {
-          fitRef.current?.fit();
-        });
       });
     } else {
       // Release GPU context for inactive tabs

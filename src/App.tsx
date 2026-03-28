@@ -492,14 +492,12 @@ export default function App() {
     );
   }
 
+  if (session.screen === "booting") {
+    return <div style={{ height: "100vh", backgroundColor: theme.bg }} />;
+  }
+
   if (session.screen !== "workspace") {
-    return (
-      <ShellView
-        theme={theme}
-        title="Restoring Workspace"
-        description="Checking the last project and binding the window."
-      />
-    );
+    return <div style={{ height: "100vh", backgroundColor: theme.bg }} />;
   }
 
   if (configError) {
@@ -517,17 +515,7 @@ export default function App() {
   }
 
   if (!workspaceConfig) {
-    return (
-      <ShellView
-        theme={theme}
-        title="Loading Workspace"
-        description={
-          session.project
-            ? `Opening ${session.project.name} and restoring tabs.`
-            : "Restoring tabs and terminal state."
-        }
-      />
-    );
+    return <div style={{ height: "100vh", backgroundColor: theme.bg }} />;
   }
 
   return (
