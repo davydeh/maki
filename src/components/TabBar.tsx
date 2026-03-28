@@ -31,10 +31,10 @@ export function TabBar({
       style={{
         display: "flex",
         alignItems: "center",
-        margin: "0 4px 12px 4px",
+        margin: "6px 4px 12px 4px",
         borderRadius: "999px",
         height: "34px",
-        padding: "2px",
+        padding: "2px 2px 2px 68px",
         gap: "1px",
         background: theme.tabBarBg,
         userSelect: "none",
