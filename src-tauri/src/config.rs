@@ -436,10 +436,6 @@ fn config_from_draft(draft: ConfigDraft) -> Result<Config, String> {
         })
         .collect::<Vec<_>>();
 
-    if processes.is_empty() {
-        return Err("Config must include at least one enabled command".to_string());
-    }
-
     Ok(Config {
         name: draft.project_name,
         theme: draft.theme,
@@ -601,21 +597,20 @@ mod tests {
     }
 
     #[test]
-    fn save_config_rejects_empty_command_lists() {
+    fn save_config_allows_empty_command_lists() {
         let temp_dir = unique_temp_dir("save-config-empty");
         fs::create_dir_all(&temp_dir).unwrap();
 
-        let error = save_config(ConfigSaveRequest {
+        let result = save_config(ConfigSaveRequest {
             project_path: temp_dir.to_string_lossy().into_owned(),
             draft: ConfigDraft {
                 project_name: "demo".to_string(),
                 theme: None,
                 commands: Vec::new(),
             },
-        })
-        .unwrap_err();
+        });
 
-        assert!(error.contains("at least one enabled command"));
+        assert!(result.is_ok());
     }
 
     #[test]

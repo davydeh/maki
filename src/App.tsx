@@ -588,14 +588,6 @@ export default function App() {
         onRunCommand={handleRunCommand}
       />
 
-      <StatusBar
-        tabs={tabs}
-        gitStatus={gitStatus}
-        projectPath={projectRoot}
-        theme={theme}
-        availableUpdate={availableUpdate}
-      />
-
       {settingsOpen && workspaceConfig && (
         <SettingsView
           config={workspaceConfig.config}

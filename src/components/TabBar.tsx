@@ -347,9 +347,8 @@ function CommandPill({
               onStopCommand(tab.id);
             }}
             title="Stop"
-            style={{ color: theme.errored }}
           >
-            <Square size={12} fill="currentColor" />
+            <Square size={8} fill="currentColor" style={{ opacity: "0.5" }} />
           </span>
         )}
         {isStopped && (
@@ -362,7 +361,7 @@ function CommandPill({
             title="Restart"
             style={{ color: theme.running }}
           >
-            <Play size={12} fill="currentColor" />
+            <Play size={8} fill="currentColor" style={{ opacity: "0.5" }} />
           </span>
         )}
       </span>

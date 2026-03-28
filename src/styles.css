@@ -54,16 +54,16 @@ body {
 .command-bar {
   display: flex;
   align-items: center;
-  height: 28px;
-  padding: 2px 4px;
-  gap: 2px;
+  /* height: 28px; */
+  padding: 2px 4px 3px;
+  gap: 4px;
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--shell-surface) 85%, black 15%),
-    var(--shell-surface)
+    color-mix(in srgb, var(--shell-surface) 5%, black 2%),
+    color-mix(in srgb, var(--shell-surface) 5%, black 5%)
   );
   font-size: 12px;
-  border-top: 1px solid var(--shell-border);
+  border-top: 1px solid color-mix(in srgb, var(--shell-surface) 15%, black 4%);
   overflow: hidden;
 }
 
@@ -88,34 +88,34 @@ body {
 }
 
 .command-pill {
-  /* color: var(--shell-muted);
-  position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 4px 10px;
-  min-width: 120px;
-  border: none;
-  white-space: nowrap;
+  justify-content: start;
+  gap: 8px;
+  padding: 3px 16px 5px 4px;
+  border-radius: 4px;
+  border: 0;
   cursor: pointer;
-  font-size: 12px; */
+  background-color: transparent;
 }
 
 .command-pill:hover {
-  /* background: rgba(205, 214, 244, 0.1); */
+  background: color-mix(in srgb, var(--shell-surface-strong) 35%, transparent);
 }
 
 .command-pill__indicator {
   display: flex;
+  width: 20px;
+  height: 20px;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: 2px;
-  background: transparent;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--shell-border);
 }
 
 .command-pill__name {
+  color: var(--shell-muted);
+  font-size: 14px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -125,32 +125,38 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
 }
 
+.command-pill__indicator:hover {
+  background: color-mix(
+    in srgb,
+    var(--shell-surface-strong) 95%,
+    var(--shell-muted) 95%
+  );
+}
+
 .command-launcher-trigger {
-  /* display: inline-flex;
+  display: inline-flex;
   min-height: 20px;
+  height: calc(100%-2px);
   align-items: center;
   gap: 5px;
+  margin: 0;
   flex: 0 0 auto;
-  padding: 2px 7px;
+  padding: 4px 7px;
   border: 1px solid var(--shell-border);
-  border-radius: 6px;
+  border-radius: 999px;
   background: color-mix(in srgb, var(--shell-surface-strong) 55%, transparent);
   color: var(--shell-fg);
   font-size: 11px;
-  cursor: pointer; */
+  cursor: pointer;
 }
 
 .command-launcher-trigger:hover {
-  border-color: color-mix(
-    in srgb,
-    var(--shell-accent) 60%,
-    var(--shell-border)
-  );
+  background: color-mix(in srgb, var(--shell-surface-strong) 35%, transparent);
 }
 
 .command-launcher-trigger__hint {

@@ -41,15 +41,7 @@ export function ConfigWizardView({
   onOpenFolder,
 }: ConfigWizardViewProps) {
   const enabledCommands = wizardDraft.commands.filter((c) => c.enabled).length;
-  const hasInvalidCommands = hasInvalidEnabledCommands(wizardDraft);
-  const canSave =
-    enabledCommands > 0 &&
-    !hasInvalidCommands &&
-    !wizardPreviewPending &&
-    !wizardSavePending &&
-    !wizardPreviewDirty &&
-    !wizardPreviewError &&
-    Boolean(wizardPreview);
+  const canSave = !wizardSavePending;
 
   return (
     <div className="shell-screen">
@@ -138,17 +130,6 @@ export function ConfigWizardView({
             </div>
           )}
 
-          {hasInvalidCommands && (
-            <div
-              style={{
-                padding: "8px 12px",
-                fontSize: "12px",
-                color: "var(--shell-danger)",
-              }}
-            >
-              Fill in name and command for all enabled entries.
-            </div>
-          )}
 
           {wizardDraft.commands.map((command) => (
             <div
@@ -319,28 +300,6 @@ export function ConfigWizardView({
           </div>
         )}
 
-        {wizardPreviewDirty && !wizardPreviewPending && (
-          <div style={{ fontSize: "12px", color: "var(--shell-muted)", padding: "0 2px" }}>
-            Config changed.{" "}
-            <button
-              type="button"
-              onClick={() => { void onRefreshPreview(); }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--shell-accent)",
-                cursor: "pointer",
-                fontSize: "12px",
-                textDecoration: "underline",
-                padding: 0,
-              }}
-            >
-              Refresh preview
-            </button>{" "}
-            before saving.
-          </div>
-        )}
-
         {/* Actions */}
         <div
           style={{
@@ -370,7 +329,7 @@ export function ConfigWizardView({
               opacity: canSave ? 1 : 0.6,
             }}
           >
-            {wizardSavePending ? "Saving..." : "Save and launch"}
+            {wizardSavePending ? "Saving..." : "Continue"}
           </button>
           <button
             type="button"

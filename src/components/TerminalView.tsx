@@ -1,4 +1,4 @@
-import { use, useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -41,29 +41,6 @@ export function TerminalView({
   const fitRef = useRef<FitAddon | null>(null);
   const webglRef = useRef<WebglAddon | null>(null);
   const sessionIdRef = useRef<number | null>(null);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [debugInfo, setDebugInfo] = useState("");
-  useEffect(() => {
-    setHasLoaded(true);
-  }, [setHasLoaded]);
-
-  // Debug helper — logs fit info visually
-  const debugFit = (label: string) => {
-    const container = containerRef.current;
-    const term = termRef.current;
-    const fit = fitRef.current;
-    const dims = fit?.proposeDimensions();
-    const info = [
-      label,
-      `container: ${container?.clientWidth}x${container?.clientHeight}`,
-      `display: ${container?.style.display}`,
-      `cols: ${term?.cols}`,
-      `proposed: ${dims?.cols}x${dims?.rows}`,
-      `webgl: ${webglRef.current ? "yes" : "no"}`,
-    ].join(" | ");
-    setDebugInfo(info);
-    console.log(`[FIT] ${info}`);
-  };
 
   // Initialize terminal and PTY
   useEffect(() => {
@@ -132,7 +109,26 @@ export function TerminalView({
       );
       unlisteners.push(unlisten2);
 
-      // PTY spawning is deferred to the active effect (after fit) so the
+      // Spawn PTY for inactive autostart tabs (background processes).
+      // Active tabs spawn in the active effect after fit() for correct dimensions.
+      if (autostart && workspaceActive && !active && sessionIdRef.current === null) {
+        try {
+          const sessionId = await invoke<number>("spawn_pty", {
+            cmd,
+            args,
+            cols: term.cols,
+            rows: term.rows,
+            cwd: cwd || null,
+            env: env || null,
+          });
+          sessionIdRef.current = sessionId;
+          onSessionCreated(tabId, sessionId);
+        } catch (e) {
+          term.write(`\x1b[31mError spawning process: ${e}\x1b[0m\r\n`);
+          onExit(tabId, -1);
+        }
+      }
+      // Active tab PTY spawning is deferred to the active effect (after fit) so the
       // shell gets the correct terminal dimensions from the start.
     })();
 
@@ -265,9 +261,7 @@ export function TerminalView({
             // Canvas fallback — no action needed
           }
         }
-        debugFit("active-pre-fit");
         fitRef.current?.fit();
-        debugFit("active-post-fit");
         if (typeof term.focus === "function") term.focus();
 
         // Spawn PTY AFTER fit so the shell gets correct dimensions
@@ -290,9 +284,7 @@ export function TerminalView({
 
         // Second fit after WebGL texture atlas initializes
         requestAnimationFrame(() => {
-          debugFit("active-2nd-raf-pre");
           fitRef.current?.fit();
-          debugFit("active-2nd-raf-post");
         });
       });
     } else {
@@ -312,7 +304,6 @@ export function TerminalView({
 
     if (typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver(() => {
-        debugFit("resize-observer");
         fitRef.current?.fit();
       });
       observer.observe(container);
@@ -330,32 +321,16 @@ export function TerminalView({
   }, [active]);
 
   return (
-    <div style={{ display: active ? "flex" : "none", flexDirection: "column", width: "100%", height: "100%" }}>
-      {/* DEBUG BAR — remove after fixing */}
-      {debugInfo && (
-        <div style={{
-          padding: "2px 8px",
-          fontSize: "10px",
-          fontFamily: "monospace",
-          background: "#f38ba8",
-          color: "#1e1e2e",
-          flexShrink: 0,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-        }}>
-          {debugInfo}
-        </div>
-      )}
-      <div
-        ref={containerRef}
-        onClick={() => termRef.current?.focus()}
-        style={{
-          flex: 1,
-          width: "100%",
-          padding: "0 4px",
-          backgroundColor: theme.terminal.background,
-        }}
-      />
-    </div>
+    <div
+      ref={containerRef}
+      onClick={() => termRef.current?.focus()}
+      style={{
+        display: active ? "block" : "none",
+        width: "100%",
+        height: "100%",
+        padding: "0 4px",
+        backgroundColor: theme.terminal.background,
+      }}
+    />
   );
 }

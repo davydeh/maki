@@ -278,12 +278,6 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         return;
       }
 
-      if (hasInvalidEnabledCommands(draftToPreview)) {
-        setWizardPreviewError("Complete every enabled command before generating the preview.");
-        setWizardPreviewPending(false);
-        setWizardPreviewSignature(null);
-        return;
-      }
 
       const requestId = previewRequestIdRef.current + 1;
       previewRequestIdRef.current = requestId;
@@ -492,21 +486,12 @@ export function useWorkspaceSession(): WorkspaceSessionState {
         return;
       }
 
-      if (hasInvalidEnabledCommands(draftToSave)) {
-        setRestoreError("Complete every enabled command before saving the config.");
-        setScreen("wizard");
-        return;
-      }
-
+      // Auto-refresh preview if stale — no need to ask the user
       if (
-        wizardPreviewPending ||
-        wizardPreviewError ||
-        !wizardPreview ||
-        wizardPreviewSignature !== getDraftSignature(draftToSave)
+        !wizardPreviewPending &&
+        (!wizardPreview || wizardPreviewSignature !== getDraftSignature(draftToSave))
       ) {
-        setRestoreError("Refresh the YAML preview before saving the config.");
-        setScreen("wizard");
-        return;
+        await refreshWizardPreview(draftToSave);
       }
 
       setWizardSavePending(true);

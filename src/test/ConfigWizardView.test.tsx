@@ -174,7 +174,7 @@ describe("ConfigWizardView", () => {
       fireEvent.click(within(row).getByLabelText("Enable"));
     }
 
-    expect(screen.getByRole("button", { name: /save and launch/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
   });
 
   it("allows manually adding a command when detection finds nothing", async () => {
@@ -197,7 +197,6 @@ describe("ConfigWizardView", () => {
     render(<SessionWizardHarness />);
 
     expect(await screen.findByRole("button", { name: /add command/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /save and launch/i })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: /add command/i }));
 
@@ -209,12 +208,7 @@ describe("ConfigWizardView", () => {
       target: { value: "npm run worker" },
     });
 
-    // Click the inline "Refresh preview" link
-    fireEvent.click(screen.getByRole("button", { name: /refresh preview/i }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /save and launch/i })).toBeEnabled();
-    });
+    expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
   });
 
   it("submits save and calls launch transition on success", async () => {
@@ -240,13 +234,7 @@ describe("ConfigWizardView", () => {
       target: { value: "web" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /refresh preview/i }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /save and launch/i })).toBeEnabled();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: /save and launch/i }));
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
     await waitFor(() => {
       expect(screen.getByTestId("session-screen")).toHaveTextContent("workspace");
@@ -265,88 +253,6 @@ describe("ConfigWizardView", () => {
         }),
       }),
     });
-  });
-
-  it("blocks save until preview is refreshed after edits", async () => {
-    mockInvoke({
-      load_app_state: createAppState(),
-      inspect_project_folder: createInspection(),
-      save_app_state: createAppState(),
-      generate_config_preview:
-        "name: alpha\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
-    });
-
-    render(<SessionWizardHarness />);
-
-    const firstCommand = await screen.findByTestId("wizard-command-detected-0");
-    fireEvent.change(within(firstCommand).getByLabelText("Name"), {
-      target: { value: "web" },
-    });
-
-    expect(screen.getByText(/config changed/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /save and launch/i })).toBeDisabled();
-    expect(invokeMock).not.toHaveBeenCalledWith("save_config", expect.anything());
-  });
-
-  it("blocks save when preview generation fails", async () => {
-    mockInvoke({
-      load_app_state: createAppState(),
-      inspect_project_folder: createInspection(),
-      save_app_state: createAppState(),
-      generate_config_preview: new Error("Config must include at least one enabled command"),
-    });
-
-    render(<SessionWizardHarness />);
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Config must include at least one enabled command"
-    );
-    expect(screen.getByRole("button", { name: /save and launch/i })).toBeDisabled();
-    expect(invokeMock).not.toHaveBeenCalledWith("save_config", expect.anything());
-  });
-
-  it("disables save when an enabled detected command is blank", async () => {
-    mockInvoke({
-      load_app_state: createAppState(),
-      inspect_project_folder: createInspection(),
-      save_app_state: createAppState(),
-      generate_config_preview:
-        "name: alpha\nprocesses:\n  - name: dev\n    cmd: npm run dev\n    autostart: true\n",
-    });
-
-    render(<SessionWizardHarness />);
-
-    const firstCommand = await screen.findByTestId("wizard-command-detected-0");
-    fireEvent.change(within(firstCommand).getByLabelText("Command"), {
-      target: { value: "   " },
-    });
-
-    expect(screen.getByText(/fill in name and command/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /save and launch/i })).toBeDisabled();
-  });
-
-  it("disables save when a manual enabled command is blank", async () => {
-    const emptyInspection = createInspection({
-      detected_stacks: [],
-      script_hints: [],
-      entrypoint_hints: [],
-    });
-
-    mockInvoke({
-      load_app_state: createAppState(),
-      inspect_project_folder: emptyInspection,
-      save_app_state: createAppState(),
-      generate_config_preview: new Error("Config must include at least one enabled command"),
-    });
-
-    render(<SessionWizardHarness />);
-
-    fireEvent.click(await screen.findByRole("button", { name: /add command/i }));
-
-    await screen.findByTestId("wizard-command-manual-0");
-
-    expect(screen.getByText(/fill in name and command/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /save and launch/i })).toBeDisabled();
   });
 
   it("calls the native save command before transitioning into workspace state", async () => {
@@ -369,10 +275,10 @@ describe("ConfigWizardView", () => {
 
     // Wait for auto-preview, then save
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /save and launch/i })).toBeEnabled();
+      expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /save and launch/i }));
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
     await waitFor(() => {
       expect(screen.getByTestId("session-screen")).toHaveTextContent("workspace");

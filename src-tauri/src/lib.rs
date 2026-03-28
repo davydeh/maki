@@ -81,6 +81,7 @@ pub fn run() {
             // Set window background color to match theme (#1e1e2e)
             // so the transparent title bar blends seamlessly
             #[cfg(target_os = "macos")]
+            #[allow(deprecated)]
             {
                 use cocoa::appkit::{NSColor, NSWindow};
                 use cocoa::base::{id, nil};
