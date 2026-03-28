@@ -19,6 +19,7 @@ function shortenHome(path: string): string {
 
 export function StatusBar({ tabs, gitStatus, projectPath, theme, availableUpdate }: StatusBarProps) {
   const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const running = tabs.filter((t) => t.status === "running").length;
   const errored = tabs.filter((t) => t.status === "errored").length;
   const stopped = tabs.filter((t) => t.status === "stopped").length;
@@ -30,7 +31,8 @@ export function StatusBar({ tabs, gitStatus, projectPath, theme, availableUpdate
     try {
       await availableUpdate.downloadAndInstall();
       await relaunch();
-    } catch {
+    } catch (e) {
+      setUpdateError(e instanceof Error ? e.message : String(e));
       setUpdating(false);
     }
   };
@@ -70,7 +72,12 @@ export function StatusBar({ tabs, gitStatus, projectPath, theme, availableUpdate
         )}
       </div>
       <div style={{ display: "flex", gap: "12px" }}>
-        {availableUpdate && (
+        {updateError && (
+          <span style={{ color: theme.errored }} title={updateError}>
+            Update failed
+          </span>
+        )}
+        {availableUpdate && !updateError && (
           <span
             onClick={handleUpdate}
             style={{
