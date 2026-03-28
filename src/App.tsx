@@ -233,17 +233,21 @@ export default function App() {
       // Restart: new ID forces TerminalView remount with fresh PTY
       const newId = genId();
       focusId = newId;
-      const isTransient = !tab.autostart;
       const updated = {
         ...tab,
         id: newId,
         status: "running" as const,
         sessionId: undefined,
         autostart: true, // must be true so PTY spawns on mount
-        transient: isTransient,
+        transient: !tab.autostart,
       };
 
-      // Remove old entry, append updated at end of process tabs
+      if (tab.autostart) {
+        // Autostart commands: replace in-place to preserve position
+        return prev.map((t) => (t.id === id ? updated : t));
+      }
+
+      // Transient (one-off) commands: remove and append at end
       const without = prev.filter((t) => t.id !== id);
       return [...without, updated];
     });
