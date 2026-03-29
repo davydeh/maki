@@ -146,10 +146,13 @@ export function CommandBar({
       </div>
 
       {hasOneOffCommands && (
-        <button className="command-launcher-trigger" onClick={onOpenLauncher}>
+        <button
+          className="command-launcher-trigger"
+          onClick={onOpenLauncher}
+        >
           <Search size={12} />
           <span>Run command</span>
-          <span className="command-launcher-trigger__hint">Cmd+P</span>
+          <span className="command-launcher-trigger__hint">&#8984;P</span>
         </button>
       )}
     </div>
