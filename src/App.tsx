@@ -107,6 +107,153 @@ function ShellView({ theme, title, description, children }: ShellViewProps) {
   );
 }
 
+function UpdateModal({
+  state,
+  update,
+  theme,
+  onClose,
+}: {
+  state: "checking" | "available" | "up-to-date" | "error";
+  update: Update | null;
+  theme: Theme;
+  onClose: () => void;
+}) {
+  const [installing, setInstalling] = useState(false);
+
+  const handleInstall = async () => {
+    if (!update) return;
+    setInstalling(true);
+    try {
+      await update.downloadAndInstall();
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+    } catch {
+      setInstalling(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 100,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(0,0,0,0.5)",
+        backdropFilter: "blur(4px)",
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: theme.tabBarBg,
+          border: `1px solid ${theme.border}`,
+          borderRadius: "12px",
+          padding: "24px",
+          width: "320px",
+          textAlign: "center",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {state === "checking" && (
+          <p style={{ color: theme.fg, fontSize: "14px" }}>Checking for updates...</p>
+        )}
+
+        {state === "up-to-date" && (
+          <>
+            <p style={{ color: theme.fg, fontSize: "14px", marginBottom: "16px" }}>
+              You're up to date!
+            </p>
+            <button
+              onClick={onClose}
+              style={{
+                padding: "6px 16px",
+                border: "none",
+                borderRadius: "6px",
+                background: theme.accent,
+                color: theme.bg,
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              OK
+            </button>
+          </>
+        )}
+
+        {state === "available" && update && (
+          <>
+            <p style={{ color: theme.fg, fontSize: "14px", marginBottom: "4px" }}>
+              Update available
+            </p>
+            <p style={{ color: theme.accent, fontSize: "18px", fontWeight: 700, marginBottom: "16px" }}>
+              v{update.version}
+            </p>
+            <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+              <button
+                onClick={onClose}
+                style={{
+                  padding: "6px 16px",
+                  border: `1px solid ${theme.border}`,
+                  borderRadius: "6px",
+                  background: "none",
+                  color: theme.fg,
+                  fontSize: "13px",
+                  cursor: "pointer",
+                }}
+              >
+                Later
+              </button>
+              <button
+                onClick={() => { void handleInstall(); }}
+                disabled={installing}
+                style={{
+                  padding: "6px 16px",
+                  border: "none",
+                  borderRadius: "6px",
+                  background: theme.accent,
+                  color: theme.bg,
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: installing ? "wait" : "pointer",
+                }}
+              >
+                {installing ? "Installing..." : "Install now"}
+              </button>
+            </div>
+          </>
+        )}
+
+        {state === "error" && (
+          <>
+            <p style={{ color: theme.errored, fontSize: "14px", marginBottom: "16px" }}>
+              Failed to check for updates
+            </p>
+            <button
+              onClick={onClose}
+              style={{
+                padding: "6px 16px",
+                border: "none",
+                borderRadius: "6px",
+                background: theme.accent,
+                color: theme.bg,
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              OK
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const session = useWorkspaceSession();
   const projectRoot =
@@ -119,6 +266,7 @@ export default function App() {
   const [commandLauncherOpen, setCommandLauncherOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
+  const [updateModal, setUpdateModal] = useState<"checking" | "available" | "up-to-date" | "error" | null>(null);
   const theme = getTheme(workspaceConfig?.config.theme);
 
   useEffect(() => {
@@ -419,13 +567,19 @@ export default function App() {
           setSettingsOpen(true);
           break;
         case "check-updates":
+          setUpdateModal("checking");
           check()
             .then((update) => {
               if (update?.available) {
                 setAvailableUpdate(update);
+                setUpdateModal("available");
+              } else {
+                setUpdateModal("up-to-date");
               }
             })
-            .catch(() => {});
+            .catch(() => {
+              setUpdateModal("error");
+            });
           break;
       }
     }).then((fn) => { unlistenMenu = fn; });
@@ -597,6 +751,15 @@ export default function App() {
           theme={theme}
           onSave={handleSettingsSave}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {updateModal && (
+        <UpdateModal
+          state={updateModal}
+          update={availableUpdate}
+          theme={theme}
+          onClose={() => setUpdateModal(null)}
         />
       )}
     </div>
