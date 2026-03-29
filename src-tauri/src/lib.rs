@@ -31,9 +31,14 @@ pub fn run() {
             let split_right = MenuItem::with_id(app, "split-right", "Split Right", true, Some("CmdOrCtrl+D"))?;
             let split_down = MenuItem::with_id(app, "split-down", "Split Down", true, Some("CmdOrCtrl+Shift+D"))?;
             let close_tab = MenuItem::with_id(app, "close-tab", "Close", true, Some("CmdOrCtrl+W"))?;
+            let check_updates = MenuItem::with_id(app, "check-updates", "Check for Updates...", true, None::<&str>)?;
+            let settings = MenuItem::with_id(app, "settings", "Settings...", true, Some("CmdOrCtrl+,"))?;
 
             let app_menu = SubmenuBuilder::new(app, "maki")
                 .about(None)
+                .item(&check_updates)
+                .separator()
+                .item(&settings)
                 .separator()
                 .hide()
                 .hide_others()

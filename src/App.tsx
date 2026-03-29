@@ -415,6 +415,18 @@ export default function App() {
         case "new-window":
           handleOpenFolder();
           break;
+        case "settings":
+          setSettingsOpen(true);
+          break;
+        case "check-updates":
+          check()
+            .then((update) => {
+              if (update?.available) {
+                setAvailableUpdate(update);
+              }
+            })
+            .catch(() => {});
+          break;
       }
     }).then((fn) => { unlistenMenu = fn; });
 
