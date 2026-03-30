@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { relaunch } from "@tauri-apps/plugin-process";
 import type { Update } from "@tauri-apps/plugin-updater";
 import type { Tab, GitStatus } from "../types";
 import type { Theme } from "../themes";
+import { UpdateStatus } from "./UpdateStatus";
 
 interface StatusBarProps {
   tabs: Tab[];
@@ -18,24 +17,10 @@ function shortenHome(path: string): string {
 }
 
 export function StatusBar({ tabs, gitStatus, projectPath, theme, availableUpdate }: StatusBarProps) {
-  const [updating, setUpdating] = useState(false);
-  const [updateError, setUpdateError] = useState<string | null>(null);
   const running = tabs.filter((t) => t.status === "running").length;
   const errored = tabs.filter((t) => t.status === "errored").length;
   const stopped = tabs.filter((t) => t.status === "stopped").length;
   const displayPath = shortenHome(projectPath);
-
-  const handleUpdate = async () => {
-    if (!availableUpdate || updating) return;
-    setUpdating(true);
-    try {
-      await availableUpdate.downloadAndInstall();
-      await relaunch();
-    } catch (e) {
-      setUpdateError(e instanceof Error ? e.message : String(e));
-      setUpdating(false);
-    }
-  };
 
   return (
     <div
@@ -72,23 +57,7 @@ export function StatusBar({ tabs, gitStatus, projectPath, theme, availableUpdate
         )}
       </div>
       <div style={{ display: "flex", gap: "12px" }}>
-        {updateError && (
-          <span style={{ color: theme.errored }} title={updateError}>
-            Update failed
-          </span>
-        )}
-        {availableUpdate && !updateError && (
-          <span
-            onClick={handleUpdate}
-            style={{
-              color: theme.accent,
-              cursor: updating ? "wait" : "pointer",
-            }}
-            title={updating ? "Installing update..." : "Click to update and restart"}
-          >
-            {updating ? "Installing..." : `Update available: v${availableUpdate.version}`}
-          </span>
-        )}
+        <UpdateStatus availableUpdate={availableUpdate} theme={theme} />
         {running > 0 && (
           <span style={{ color: theme.running }}>{running} running</span>
         )}
