@@ -2,11 +2,11 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
   type CSSProperties,
   type ReactNode,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { ConfigWizardView } from "./components/ConfigWizardView";
 import { ProjectPickerView } from "./components/ProjectPickerView";
 import { SettingsView } from "./components/SettingsView";
@@ -15,14 +15,10 @@ import { TabBar, CommandBar, CommandLauncher } from "./components/TabBar";
 import { TerminalView } from "./components/TerminalView";
 import { useWorkspaceSession } from "./hooks/useWorkspaceSession";
 import { check, type Update } from "@tauri-apps/plugin-updater";
+import { listenSafely } from "./tauriEvents";
 import { getTheme, type Theme } from "./themes";
+import { activateTab, createTabsFromConfig, genTabId } from "./workspaceTabs";
 import type { GitStatus, LoadedWorkspaceConfig, MakiConfig, Tab } from "./types";
-
-let nextId = 0;
-
-function genId() {
-  return `tab-${nextId++}`;
-}
 
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -39,50 +35,6 @@ function createShellVars(theme: Theme): CSSProperties {
     "--shell-border": theme.border,
     "--shell-danger": theme.errored,
   } as CSSProperties;
-}
-
-function createTabsFromConfig(config: MakiConfig, projectRoot: string): Tab[] {
-  const shell = "/bin/zsh";
-  const shellTabs: Tab[] = [];
-  const processTabs: Tab[] = [];
-
-  // Always start with 2 default shell tabs
-  const configuredShells = config.shells ?? [];
-  const defaultShellCount = Math.max(2, configuredShells.length);
-
-  for (let i = 0; i < defaultShellCount; i++) {
-    const sh = configuredShells[i];
-    const shellCommand = sh?.cmd || shell;
-    shellTabs.push({
-      id: genId(),
-      name: sh?.name || `shell${i > 0 ? ` ${i + 1}` : ""}`,
-      type: "shell",
-      cmd: shellCommand,
-      args: [],
-      status: "running",
-      autostart: true,
-      workspacePath: projectRoot,
-      cwd: projectRoot,
-    });
-  }
-
-  for (const proc of config.processes) {
-    processTabs.push({
-      id: genId(),
-      name: proc.name,
-      type: "process",
-      cmd: shell,
-      args: ["-c", proc.cmd],
-      status: proc.autostart ? "running" : "stopped",
-      autostart: proc.autostart,
-      workspacePath: projectRoot,
-      cwd: proc.cwd || projectRoot,
-      env: proc.env,
-    });
-  }
-
-  // Shells first, then processes
-  return [...shellTabs, ...processTabs];
 }
 
 interface ShellViewProps {
@@ -268,6 +220,16 @@ export default function App() {
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
   const [updateModal, setUpdateModal] = useState<"checking" | "available" | "up-to-date" | "error" | null>(null);
   const theme = getTheme(workspaceConfig?.config.theme);
+  const tabsRef = useRef(tabs);
+  const activeTabIdRef = useRef(activeTabId);
+
+  useEffect(() => {
+    tabsRef.current = tabs;
+  }, [tabs]);
+
+  useEffect(() => {
+    activeTabIdRef.current = activeTabId;
+  }, [activeTabId]);
 
   useEffect(() => {
     if (session.screen !== "workspace" || !projectRoot) {
@@ -352,19 +314,22 @@ export default function App() {
       });
   }, [session.screen]);
 
-  const handleTabClick = useCallback((id: string) => setActiveTabId(id), []);
+  const handleTabClick = useCallback((id: string) => {
+    setTabs((prev) => activateTab(prev, id));
+    setActiveTabId(id);
+  }, []);
 
   const handleTabClose = useCallback(
     (id: string) => {
       setTabs((prev) => {
         const filtered = prev.filter((tab) => tab.id !== id);
-        if (activeTabId === id && filtered.length > 0) {
-          setActiveTabId(filtered[filtered.length - 1].id);
-        }
+        setActiveTabId((current) => (
+          current === id ? filtered[filtered.length - 1]?.id ?? "" : current
+        ));
         return filtered;
       });
     },
-    [activeTabId]
+    []
   );
 
   const handleRunCommand = useCallback((id: string) => {
@@ -381,7 +346,7 @@ export default function App() {
       }
 
       // Restart: new ID forces TerminalView remount with fresh PTY
-      const newId = genId();
+      const newId = genTabId();
       focusId = newId;
       const updated = {
         ...tab,
@@ -424,7 +389,7 @@ export default function App() {
   }, []);
 
   const handleNewTab = useCallback(() => {
-    const id = genId();
+    const id = genTabId();
     const tab: Tab = {
       id,
       name: "shell",
@@ -509,6 +474,8 @@ export default function App() {
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      const currentTabs = tabsRef.current;
+
       if (event.metaKey && event.key === "t") {
         event.preventDefault();
         handleNewTab();
@@ -516,8 +483,8 @@ export default function App() {
 
       if (event.metaKey && event.key === "w") {
         event.preventDefault();
-        if (activeTabId && tabs.length > 1) {
-          handleTabClose(activeTabId);
+        if (activeTabIdRef.current && currentTabs.length > 1) {
+          handleTabClose(activeTabIdRef.current);
         }
       }
 
@@ -538,10 +505,10 @@ export default function App() {
 
       if (event.metaKey && event.key >= "1" && event.key <= "9") {
         event.preventDefault();
-        const shellTabs = tabs.filter((t) => t.type === "shell");
+        const shellTabs = currentTabs.filter((t) => t.type === "shell");
         const index = parseInt(event.key, 10) - 1;
         if (index < shellTabs.length) {
-          setActiveTabId(shellTabs[index].id);
+          handleTabClick(shellTabs[index].id);
         }
       }
     };
@@ -549,15 +516,17 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown);
 
     // Listen for native menu actions
-    let unlistenMenu: (() => void) | null = null;
-    listen<string>("menu-action", (event) => {
+    const unlistenMenu = listenSafely<string>("menu-action", (event) => {
+      const currentActiveTabId = activeTabIdRef.current;
+      const currentTabs = tabsRef.current;
+
       switch (event.payload) {
         case "new-tab":
           handleNewTab();
           break;
         case "close-tab":
-          if (activeTabId && tabs.length > 1) {
-            handleTabClose(activeTabId);
+          if (currentActiveTabId && currentTabs.length > 1) {
+            handleTabClose(currentActiveTabId);
           }
           break;
         case "new-window":
@@ -582,13 +551,13 @@ export default function App() {
             });
           break;
       }
-    }).then((fn) => { unlistenMenu = fn; });
+    });
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      unlistenMenu?.();
+      unlistenMenu();
     };
-  }, [activeTabId, handleNewTab, handleOpenFolder, handleTabClose, session.screen, tabs]);
+  }, [handleNewTab, handleOpenFolder, handleTabClick, handleTabClose, session.screen]);
 
   if (session.screen === "picker" || session.screen === "invalid") {
     return (

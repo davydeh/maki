@@ -912,6 +912,52 @@ describe("App workspace integration", () => {
     sessionSpy.mockRestore();
   });
 
+  it("spawns only the active shell eagerly and starts the second shell on first focus", async () => {
+    const project = createInspection();
+
+    const sessionSpy = vi
+      .spyOn(workspaceSessionModule, "useWorkspaceSession")
+      .mockImplementation(() =>
+        createSessionState({
+          screen: "workspace",
+          project,
+        })
+      );
+
+    mockInvoke({
+      get_config: createMakiConfig(),
+      get_git_status: {
+        branch: "main",
+        dirty: false,
+        is_repo: true,
+      },
+      spawn_pty: [41, 42, 43],
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      const spawnCalls = invokeMock.mock.calls.filter(
+        ([command]) => command === "spawn_pty"
+      );
+      expect(spawnCalls).toHaveLength(2);
+    });
+
+    fireEvent.keyDown(window, {
+      key: "2",
+      metaKey: true,
+    });
+
+    await waitFor(() => {
+      const spawnCalls = invokeMock.mock.calls.filter(
+        ([command]) => command === "spawn_pty"
+      );
+      expect(spawnCalls).toHaveLength(3);
+    });
+
+    sessionSpy.mockRestore();
+  });
+
   it("preserves git polling only when a project root is active", async () => {
     vi.useFakeTimers();
 

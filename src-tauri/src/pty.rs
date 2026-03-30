@@ -1,6 +1,7 @@
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::Serialize;
 use std::collections::HashMap;
+use std::io;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
@@ -9,6 +10,7 @@ struct PtySession {
     master: Mutex<Box<dyn portable_pty::MasterPty + Send>>,
     writer: Mutex<Box<dyn Write + Send>>,
     child: Mutex<Box<dyn portable_pty::Child + Send>>,
+    killer: Mutex<Box<dyn portable_pty::ChildKiller + Send + Sync>>,
 }
 
 // Safety: all fields are behind Mutex, so PtySession is Send + Sync
@@ -81,6 +83,7 @@ pub fn spawn_pty(
         .spawn_command(cmd_builder)
         .map_err(|e| e.to_string())?;
     drop(pair.slave);
+    let killer = child.clone_killer();
 
     let reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
@@ -93,100 +96,121 @@ pub fn spawn_pty(
         master: Mutex::new(pair.master),
         writer: Mutex::new(writer),
         child: Mutex::new(child),
+        killer: Mutex::new(killer),
     });
 
-    state.sessions.lock().unwrap().insert(session_id, session);
+    state
+        .sessions
+        .lock()
+        .unwrap()
+        .insert(session_id, Arc::clone(&session));
 
     let sid = session_id;
     std::thread::spawn(move || {
-        read_pty_output(reader, sid, app);
+        read_pty_output(reader, session, sid, app);
     });
 
     Ok(session_id)
 }
 
-fn read_pty_output(mut reader: Box<dyn Read + Send>, session_id: u32, app: AppHandle) {
+fn read_pty_output(
+    mut reader: Box<dyn Read + Send>,
+    session: Arc<PtySession>,
+    session_id: u32,
+    app: AppHandle,
+) {
     let mut buf = [0u8; 65536];
-    // Carry-over buffer for incomplete UTF-8 sequences split across reads.
-    // A UTF-8 character is at most 4 bytes, so 4 bytes is sufficient.
-    let mut carry = [0u8; 4];
-    let mut carry_len: usize = 0;
+    let mut carry = Vec::with_capacity(4);
 
     loop {
-        // Place any leftover bytes at the start of the buffer
-        buf[..carry_len].copy_from_slice(&carry[..carry_len]);
-
-        match reader.read(&mut buf[carry_len..]) {
+        match reader.read(&mut buf) {
             Ok(0) => {
-                // Flush any remaining carry bytes (incomplete sequence at EOF)
-                if carry_len > 0 {
-                    let text = String::from_utf8_lossy(&buf[..carry_len]).into_owned();
+                if !carry.is_empty() {
+                    let text = String::from_utf8_lossy(&carry).into_owned();
                     let _ = app.emit("pty-output", &PtyOutput { session_id, data: text });
+                    carry.clear();
                 }
-                let _ = app.emit("pty-exit", PtyExit { session_id, exit_code: 0 });
+                let _ = app.emit(
+                    "pty-exit",
+                    PtyExit {
+                        session_id,
+                        exit_code: wait_for_exit_code(&session),
+                    },
+                );
                 break;
             }
             Ok(n) => {
-                let total = carry_len + n;
-                carry_len = 0;
-
-                // Find the last valid UTF-8 boundary. Walk backwards from the
-                // end to find any incomplete multi-byte sequence.
-                let valid_end = find_utf8_safe_boundary(&buf[..total]);
-                let tail = total - valid_end;
-
-                if tail > 0 && tail <= 4 {
-                    // Save the incomplete trailing bytes for the next read
-                    carry[..tail].copy_from_slice(&buf[valid_end..total]);
-                    carry_len = tail;
-                }
-
-                if valid_end > 0 {
-                    // Safety: valid_end is a valid UTF-8 boundary
-                    let text = unsafe { std::str::from_utf8_unchecked(&buf[..valid_end]) };
+                let text = decode_terminal_bytes(&buf[..n], &mut carry);
+                if !text.is_empty() {
                     let _ = app.emit("pty-output", &PtyOutput {
                         session_id,
-                        data: text.to_owned(),
+                        data: text,
                     });
                 }
             }
             Err(_) => {
-                let _ = app.emit("pty-exit", PtyExit { session_id, exit_code: -1 });
+                let _ = app.emit(
+                    "pty-exit",
+                    PtyExit {
+                        session_id,
+                        exit_code: wait_for_exit_code(&session),
+                    },
+                );
                 break;
             }
         }
     }
 }
 
-/// Find the largest prefix of `data` that is valid UTF-8. If the last few
-/// bytes are the start of a multi-byte sequence that is incomplete, return
-/// the position just before them so the caller can carry them to the next read.
-fn find_utf8_safe_boundary(data: &[u8]) -> usize {
-    // std::str::from_utf8 tells us where an error starts. We only need to
-    // check the last 3 bytes at most (max UTF-8 char is 4 bytes).
-    match std::str::from_utf8(data) {
-        Ok(_) => data.len(), // All valid
-        Err(e) => {
-            let valid = e.valid_up_to();
-            // Check if the error is an incomplete sequence at the very end
-            // (as opposed to genuinely invalid bytes in the middle).
-            if e.error_len().is_none() {
-                // Incomplete sequence at end — return the valid prefix
-                valid
-            } else {
-                // Invalid byte in the middle — include it (lossy) and keep going.
-                // This handles genuinely malformed output by skipping bad bytes.
-                // Find the next safe point after the bad byte(s).
-                let skip = e.error_len().unwrap();
-                let after = valid + skip;
-                if after >= data.len() {
-                    data.len()
+fn decode_terminal_bytes(data: &[u8], carry: &mut Vec<u8>) -> String {
+    let mut combined = Vec::with_capacity(carry.len() + data.len());
+    combined.extend_from_slice(carry);
+    combined.extend_from_slice(data);
+    carry.clear();
+
+    let mut output = String::new();
+    let mut cursor = 0;
+
+    while cursor < combined.len() {
+        match std::str::from_utf8(&combined[cursor..]) {
+            Ok(valid) => {
+                output.push_str(valid);
+                break;
+            }
+            Err(error) => {
+                let valid_up_to = error.valid_up_to();
+                if valid_up_to > 0 {
+                    let valid_end = cursor + valid_up_to;
+                    let valid = std::str::from_utf8(&combined[cursor..valid_end])
+                        .expect("utf-8 prefix validated by valid_up_to");
+                    output.push_str(valid);
+                    cursor = valid_end;
+                }
+
+                if let Some(error_len) = error.error_len() {
+                    let invalid_end = cursor + error_len;
+                    output.push_str(&String::from_utf8_lossy(&combined[cursor..invalid_end]));
+                    cursor = invalid_end;
                 } else {
-                    // Recursively find the boundary in the remaining data
-                    after + find_utf8_safe_boundary(&data[after..])
+                    carry.extend_from_slice(&combined[cursor..]);
+                    break;
                 }
             }
         }
+    }
+
+    output
+}
+
+fn wait_for_exit_code(session: &Arc<PtySession>) -> i32 {
+    let mut child = session.child.lock().unwrap();
+    exit_code_from_status(child.wait())
+}
+
+fn exit_code_from_status(status: io::Result<portable_pty::ExitStatus>) -> i32 {
+    match status {
+        Ok(exit_status) => exit_status.exit_code() as i32,
+        Err(_) => -1,
     }
 }
 
@@ -231,8 +255,41 @@ pub fn resize_pty(
 pub fn kill_pty(state: tauri::State<'_, PtyState>, session_id: u32) -> Result<(), String> {
     let mut sessions = state.sessions.lock().unwrap();
     if let Some(session) = sessions.remove(&session_id) {
-        let mut child = session.child.lock().unwrap();
-        let _ = child.kill();
+        let mut killer = session.killer.lock().unwrap();
+        let _ = killer.kill();
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use portable_pty::ExitStatus;
+
+    #[test]
+    fn decode_terminal_bytes_carries_incomplete_utf8_between_reads() {
+        let mut carry = Vec::new();
+
+        let first = decode_terminal_bytes(&[0xE2, 0x82], &mut carry);
+        let second = decode_terminal_bytes(&[0xAC], &mut carry);
+
+        assert_eq!(first, "");
+        assert_eq!(second, "€");
+        assert!(carry.is_empty());
+    }
+
+    #[test]
+    fn decode_terminal_bytes_replaces_invalid_sequences_without_panic() {
+        let mut carry = Vec::new();
+
+        let decoded = decode_terminal_bytes(&[b'a', 0x80, b'b'], &mut carry);
+
+        assert_eq!(decoded, "a\u{fffd}b");
+        assert!(carry.is_empty());
+    }
+
+    #[test]
+    fn exit_code_from_status_returns_real_exit_code() {
+        assert_eq!(exit_code_from_status(Ok(ExitStatus::with_exit_code(7))), 7);
+    }
 }

@@ -5,9 +5,9 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import "@xterm/xterm/css/xterm.css";
 import type { Theme } from "../themes";
+import { listenSafely } from "../tauriEvents";
 
 interface TerminalViewProps {
   tabId: string;
@@ -50,6 +50,7 @@ export function TerminalView({
   useEffect(() => {
     if (!containerRef.current) return;
 
+    let disposed = false;
     const term = new Terminal({
       theme: theme.terminal,
       fontFamily: '"Menlo", "SF Mono", "Monaco", monospace',
@@ -89,48 +90,39 @@ export function TerminalView({
     fitRef.current = fitAddon;
 
     // Listen for PTY output
-    const unlisteners: Array<() => void> = [];
+    const unlisteners: Array<() => void> = [
+      listenSafely<{ session_id: number; data: string }>("pty-output", (event) => {
+        if (event.payload.session_id === sessionIdRef.current) {
+          term.write(event.payload.data);
+        }
+      }),
+      listenSafely<{ session_id: number; exit_code: number }>("pty-exit", (event) => {
+        if (event.payload.session_id === sessionIdRef.current) {
+          const code = event.payload.exit_code;
+          sessionIdRef.current = null;
+          const status = code === 0
+            ? "\x1b[32m✓ exited\x1b[0m"
+            : `\x1b[31m✗ exited (${code})\x1b[0m`;
+          term.write(`\r\n${status}\r\n`);
+          term.write("\x1b[90mPress \x1b[0mr\x1b[90m to restart, \x1b[0mq\x1b[90m to close\x1b[0m\r\n");
+
+          const disposable = term.onData((data) => {
+            const key = data.toLowerCase();
+            if (key === "r") {
+              disposable.dispose();
+              onRestart(tabId);
+            } else if (key === "q" || key === "w") {
+              disposable.dispose();
+              onClose(tabId);
+            }
+          });
+
+          onExit(tabId, code);
+        }
+      }),
+    ];
 
     (async () => {
-      const unlisten1 = await listen<{ session_id: number; data: string }>(
-        "pty-output",
-        (event) => {
-          if (event.payload.session_id === sessionIdRef.current) {
-            term.write(event.payload.data);
-          }
-        }
-      );
-      unlisteners.push(unlisten1);
-
-      const unlisten2 = await listen<{ session_id: number; exit_code: number }>(
-        "pty-exit",
-        (event) => {
-          if (event.payload.session_id === sessionIdRef.current) {
-            const code = event.payload.exit_code;
-            const status = code === 0
-              ? "\x1b[32m✓ exited\x1b[0m"
-              : `\x1b[31m✗ exited (${code})\x1b[0m`;
-            term.write(`\r\n${status}\r\n`);
-            term.write("\x1b[90mPress \x1b[0mr\x1b[90m to restart, \x1b[0mq\x1b[90m to close\x1b[0m\r\n");
-
-            // Listen for keypress to restart or close
-            const disposable = term.onData((data) => {
-              const key = data.toLowerCase();
-              if (key === "r") {
-                disposable.dispose();
-                onRestart(tabId);
-              } else if (key === "q" || key === "w") {
-                disposable.dispose();
-                onClose(tabId);
-              }
-            });
-
-            onExit(tabId, code);
-          }
-        }
-      );
-      unlisteners.push(unlisten2);
-
       // Spawn PTY for inactive autostart tabs (background processes).
       // Active tabs spawn in the active effect after fit() for correct dimensions.
       if (autostart && workspaceActive && !active && sessionIdRef.current === null) {
@@ -143,11 +135,17 @@ export function TerminalView({
             cwd: cwd || null,
             env: env || null,
           });
+          if (disposed) {
+            void invoke("kill_pty", { sessionId });
+            return;
+          }
           sessionIdRef.current = sessionId;
           onSessionCreated(tabId, sessionId);
         } catch (e) {
-          term.write(`\x1b[31mError spawning process: ${e}\x1b[0m\r\n`);
-          onExit(tabId, -1);
+          if (!disposed) {
+            term.write(`\x1b[31mError spawning process: ${e}\x1b[0m\r\n`);
+            onExit(tabId, -1);
+          }
         }
       }
       // Active tab PTY spawning is deferred to the active effect (after fit) so the
@@ -246,6 +244,7 @@ export function TerminalView({
     });
 
     return () => {
+      disposed = true;
       unlisteners.forEach((fn) => fn());
       if (sessionIdRef.current !== null) {
         invoke("kill_pty", { sessionId: sessionIdRef.current });
@@ -266,8 +265,10 @@ export function TerminalView({
     const term = termRef.current;
     if (!term) return;
 
+    let cancelled = false;
     if (active) {
       requestAnimationFrame(() => {
+        if (cancelled) return;
         // Load WebGL BEFORE fit — WebGL changes cell dimensions,
         // so fitting first would calculate wrong column count
         if (!webglRef.current) {
@@ -296,11 +297,17 @@ export function TerminalView({
             cwd: cwd || null,
             env: env || null,
           }).then((sessionId) => {
+            if (cancelled) {
+              void invoke("kill_pty", { sessionId });
+              return;
+            }
             sessionIdRef.current = sessionId;
             onSessionCreated(tabId, sessionId);
           }).catch((e) => {
-            term.write(`\x1b[31mError spawning process: ${e}\x1b[0m\r\n`);
-            onExit(tabId, -1);
+            if (!cancelled) {
+              term.write(`\x1b[31mError spawning process: ${e}\x1b[0m\r\n`);
+              onExit(tabId, -1);
+            }
           });
         }
 
@@ -312,6 +319,9 @@ export function TerminalView({
         webglRef.current = null;
       }
     }
+    return () => {
+      cancelled = true;
+    };
   }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ResizeObserver re-fits terminal when container dimensions change

@@ -113,16 +113,23 @@ fn parse_iterm2_colors(xml: &str) -> Result<HashMap<String, String>, String> {
 
                     while i < lines.len() && !lines[i].contains("</dict>") {
                         if let Some(component_key) = extract_tag_content(lines[i], "key") {
-                            i += 1;
-                            if i < lines.len() {
-                                if let Some(val) = extract_tag_content(lines[i], "real") {
-                                    if let Ok(v) = val.parse::<f64>() {
-                                        match component_key.as_str() {
-                                            "Red Component" => r = v,
-                                            "Green Component" => g = v,
-                                            "Blue Component" => b = v,
-                                            _ => {}
-                                        }
+                            let current_line_value = extract_tag_content(lines[i], "real");
+                            let mut value = current_line_value;
+
+                            if value.is_none() {
+                                i += 1;
+                                if i < lines.len() {
+                                    value = extract_tag_content(lines[i], "real");
+                                }
+                            }
+
+                            if let Some(val) = value {
+                                if let Ok(v) = val.parse::<f64>() {
+                                    match component_key.as_str() {
+                                        "Red Component" => r = v,
+                                        "Green Component" => g = v,
+                                        "Blue Component" => b = v,
+                                        _ => {}
                                     }
                                 }
                             }
